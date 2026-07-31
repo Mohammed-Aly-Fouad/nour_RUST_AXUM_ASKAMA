@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "name": "nour_AXUM_ASKAMA",
+  "description": "",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git",
+    "apicat.private.*",
+    ".apicat"
+  ]
+}
