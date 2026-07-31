@@ -79,7 +79,7 @@ pub async fn create_brand_web(
     .await;
 
     // Redirect back to the main brands page
-    Redirect::to("/brands").into_response()
+    Redirect::to("/web/brands").into_response()
 }
 
 /// 3. Render the page with a specific brand pre-loaded in the edit form
@@ -155,7 +155,7 @@ pub async fn update_brand_web(
     .execute(&state.pool)
     .await;
 
-    Redirect::to("/brands").into_response()
+    Redirect::to("/web/brands").into_response()
 }
 
 /// 5. Handle brand deletion from the web interface
@@ -167,5 +167,5 @@ pub async fn delete_brand_web(
         .execute(&state.pool)
         .await;
 
-    Redirect::to("/brands").into_response()
+    Redirect::to("/web/brands").into_response()
 }
