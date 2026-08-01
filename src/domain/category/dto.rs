@@ -3,9 +3,10 @@ use sqlx::FromRow;
 use chrono::{DateTime, Utc};
 use askama::Template;
 use askama_web::WebTemplate;
+use serde::Deserializer;
 
 /// 1. DTO لعرض بيانات الفئة (قادمة من قاعدة البيانات)
-#[derive(Deserialize, Serialize, FromRow)]
+#[derive(Deserialize, Serialize, FromRow, Clone)]
 pub struct CategoryResponseDto {
     pub id: i32,
     pub name: String,
@@ -17,10 +18,28 @@ pub struct CategoryResponseDto {
 }
 
 /// 2. نموذج إنشاء الفئة عبر واجهة الويب (HTML Forms)
+
+
+pub fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    match opt {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => match s.parse::<i32>() {
+            Ok(v) => Ok(Some(v)),
+            Err(e) => Err(serde::de::Error::custom(e)),
+        },
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct CreateCategoryForm {
     pub name: String,
     pub name_ar: String,
+    #[serde(deserialize_with = "empty_string_as_none", default)]
     pub parent_id: Option<i32>,
     pub notes: Option<String>,
 }
@@ -66,6 +85,7 @@ impl CreateCategoryForm {
 pub struct UpdateCategoryForm {
     pub name: String,
     pub name_ar: String,
+    #[serde(deserialize_with = "empty_string_as_none", default)]
     pub parent_id: Option<i32>,
     pub notes: Option<String>,
 }

@@ -40,3 +40,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Utilities
 uuid = { version = "1.10", features = ["v4", "serde"] }
 regex = "1.13.1"
+
+urlencoding = "2.1"

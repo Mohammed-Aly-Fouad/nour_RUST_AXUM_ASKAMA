@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إدارة الفئات</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; margin: 40px; background: #f9f9f9; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .alert-error { background: #ffe6e6; color: #cc0000; padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        .alert-success { background: #e6ffed; color: #006622; padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        form div { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], textarea, select { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { padding: 8px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button.btn-danger { background: #dc3545; }
+        button.btn-secondary { background: #6c757d; }
+        .card { border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 6px; background: #fff; }
+        .card-actions { margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>إدارة الفئات</h1>
+
+    <!-- رسائل الخطأ والنجاح -->
+    {% if let Some(err) = error_message %}
+        <div class="alert-error">{{ err }}</div>
+    {% endif %}
+    {% if let Some(succ) = success_message %}
+        <div class="alert-success">{{ succ }}</div>
+    {% endif %}
+
+    <!-- نموذج الإنشاء أو التعديل ديناميكياً -->
+    <div class="card" style="background: #f1f3f5;">
+        {% if let Some(editing) = edit_category %}
+            <h3>تعديل الفئة: {{ editing.name }}</h3>
+            <form action="/web/categories/{{ editing.id }}/update" method="POST">
+        {% else %}
+            <h3>إنشاء فئة جديدة</h3>
+            <form action="/web/categories" method="POST">
+        {% endif %}
+
+            <div>
+                <label>اسم الفئة (بالإنجليزية):</label>
+                <input type="text" name="name" value="{% if let Some(editing) = edit_category %}{{ editing.name }}{% endif %}" required>
+            </div>
+
+            <div>
+                <label>اسم الفئة (بالعربية):</label>
+                <input type="text" name="name_ar" value="{% if let Some(editing) = edit_category %}{{ editing.name_ar }}{% endif %}" required>
+            </div>
+
+            <div>
+                <label>الفئة الرئيسية (اختياري):</label>
+                <select name="parent_id">
+                    <option value="">-- بدون أب (فئة رئيسية جذرية) --</option>
+                    {% for cat in categories %}
+                        <!-- تجنب اختيار الفئة لنفسها أو اختيار الفئات الفرعية كأب بناءً على القواعد -->
+                        {% if let Some(editing) = edit_category %}
+                            {% if cat.id != editing.id && cat.parent_id.is_none() %}
+                                <option value="{{ cat.id }}" {% if editing.parent_id.is_some() && editing.parent_id.unwrap() == cat.id %}selected{% endif %}>
+                                    {{ cat.name_ar }} ({{ cat.name }})
+                                </option>
+                            {% endif %}
+                        {% else %}
+                            {% if cat.parent_id.is_none() %}
+                                <option value="{{ cat.id }}">
+                                    {{ cat.name_ar }} ({{ cat.name }})
+                                </option>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label>ملاحظات:</label>
+<textarea name="notes">{% if let Some(edit_cat) = edit_category %}{% if let Some(n) = edit_cat.notes %}{{ n }}{% endif %}{% endif %}</textarea>            </div>
+
+            <button type="submit">
+                {% if edit_category.is_some() %}تحديث الفئة{% else %}إنشاء الفئة{% endif %}
+            </button>
+            
+            {% if edit_category.is_some() %}
+                <a href="/web/categories" style="margin-right: 10px;"><button type="button" class="btn-secondary">إلغاء التعديل</button></a>
+            {% endif %}
+        </form>
+    </div>
+
+    <hr>
+
+    <!-- قائمة الفئات (Cards) -->
+    <h2>الفئات الحالية</h2>
+    {% if categories.is_empty() %}
+        <p>لا توجد فئات مضافة حالياً.</p>
+    {% else %}
+        {% for cat in categories %}
+            <div class="card">
+                <h3>{{ cat.name_ar }} <small style="color: #666; font-size: 0.8em;">({{ cat.name }})</small></h3>
+                {% if let Some(notes) = cat.notes %}
+                    <p><strong>ملاحظات:</strong> {{ notes }}</p>
+                {% endif %}
+                <p><small>معرف الأب: {% if let Some(pid) = cat.parent_id %}{{ pid }}{% else %}جذرية (رئيسية){% endif %}</small></p>
+
+                <div class="card-actions">
+                    <!-- زر التعديل: يعيد توجيه الصفحة لملء نموذج التعديل بالأعلى -->
+                    <a href="/web/categories?edit={{ cat.id }}"><button type="button" class="btn-secondary">تعديل</button></a>
+
+                    <!-- نموذج الحذف -->
+                    <form action="/web/categories/{{ cat.id }}/delete" method="POST" style="display:inline; margin-right: 5px;">
+                        <button type="submit" class="btn-danger" onclick="return confirm('هل أنت متأكد من حذف هذه الفئة؟');">حذف</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // البحث عن أي عنصر يحتوي على class يبدأ بـ alert- (مثل alert-error أو alert-success)
+        const alertBox = document.querySelector('[class^="alert-"]'); 
+
+        if (alertBox) {
+            // 1. إخفاء الرسالة تلقائياً بعد 5 ثوانٍ
+            setTimeout(() => {
+                alertBox.style.transition = "opacity 0.5s ease";
+                alertBox.style.opacity = "0";
+                setTimeout(() => alertBox.remove(), 500);
+            }, 5000);
+
+            // 2. إضافة زر إغلاق (X) إذا لم يكن موجوداً مسبقاً
+            if (!alertBox.querySelector(".close-btn")) {
+                const closeBtn = document.createElement("span");
+                closeBtn.innerHTML = " &times;";
+                closeBtn.className = "close-btn";
+                closeBtn.style.cursor = "pointer";
+                closeBtn.style.float = "left";
+                closeBtn.style.fontWeight = "bold";
+                closeBtn.style.marginLeft = "10px";
+                
+                closeBtn.onclick = function () {
+                    alertBox.style.opacity = "0";
+                    setTimeout(() => alertBox.remove(), 500);
+                };
+                
+                alertBox.prepend(closeBtn);
+            }
+        }
+    });
+</script>
+</body>
+</html>
