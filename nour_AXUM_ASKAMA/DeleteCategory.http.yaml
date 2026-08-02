@@ -1,4 +1,4 @@
 method: delete
-url: localhost:3000/api/categories/818
+url: localhost:3000/api/categories/820
 requestBody:
   type: application/json

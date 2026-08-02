@@ -1,2 +1,11 @@
 method: patch
-url: localhost:3000/api/categories/
+url: localhost:3000/api/categories/818
+requestBody:
+  type: application/json
+  data: "{\r
+
+    \          \"name\": \"Books used\"\r
+
+    \          \r
+
+    \        }"

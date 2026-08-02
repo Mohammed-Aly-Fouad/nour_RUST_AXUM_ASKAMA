@@ -1,0 +1,11 @@
+method: post
+url: localhost:3000/api/brands
+requestBody:
+  type: application/json
+  data: "{\r
+
+    \     \"name\": \"MAdDENd\",\r
+
+    \        \"name_ar\": \"ddمادن\"\r
+
+    }"

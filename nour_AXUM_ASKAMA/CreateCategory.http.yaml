@@ -1,2 +1,14 @@
 method: post
-url: localhost:3000/api/categories
+url: localhost:3000/api/categories?{{
+parameters:
+  query:
+    - name: "{{"
+requestBody:
+  type: application/json
+  data: "{\r
+
+    \    \"name\": \"Books\",\r
+
+    \    \"name_ar\": \"كتب خارجية\"\r
+
+    }"
