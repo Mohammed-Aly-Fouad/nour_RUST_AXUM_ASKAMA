@@ -1,5 +1,2 @@
-method: patch
-url: localhost:3000/api/categories/805
-requestBody:
-  type: application/json
-  data: "{\r\n    \"name\": \"Sawsan\"\r\n}"
+method: post
+url: localhost:3000/api/categories

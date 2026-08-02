@@ -1,0 +1,52 @@
+/// 6. هيكل التحديث الجزئي لفئة عبر الـ JSON API (PATCH / PUT)
+#[derive(Debug, Deserialize)]
+pub struct UpdateCategoryApiDto {
+    pub name: Option<String>,
+    pub name_ar: Option<String>,
+    pub parent_id: Option<i32>,
+    pub notes: Option<String>,
+}
+
+impl UpdateCategoryApiDto {
+    pub fn validate(&self, current_category_id: i32, existing_categories: &[CategoryResponseDto]) -> Result<(), String> {
+        if let Some(ref name) = self.name {
+            let trimmed_name = name.trim();
+            if trimmed_name.is_empty() {
+                return Err("English name cannot be empty".to_string());
+            }
+            if trimmed_name.chars().count() > 50 {
+                return Err("English name must not exceed 50 characters".to_string());
+            }
+        }
+
+        if let Some(ref name_ar) = self.name_ar {
+            let trimmed_name_ar = name_ar.trim();
+            if trimmed_name_ar.is_empty() {
+                return Err("Arabic name cannot be empty".to_string());
+            }
+            if trimmed_name_ar.chars().count() > 50 {
+                return Err("Arabic name must not exceed 50 characters".to_string());
+            }
+        }
+
+        if let Some(pid) = self.parent_id {
+            if pid == current_category_id {
+                return Err("Cannot set a category as a parent to itself".to_string());
+            }
+
+            let parent_category = existing_categories.iter().find(|cat| cat.id == pid);
+            match parent_category {
+                None => {
+                    return Err("Parent ID does not exist".to_string());
+                }
+                Some(parent) => {
+                    if parent.parent_id.is_some() {
+                        return Err("Cannot select a sub-category as a parent. Must be a top-level category.".to_string());
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}

@@ -1,0 +1,149 @@
+pub async fn update_category(
+    State(state): State<AppState>,
+    Path(category_id): Path<i32>,
+    Json(payload): Json<UpdateCategoryApiDto>,
+) -> impl IntoResponse {
+    // 1. Fetch the existing category to verify it exists
+    let old_category = match sqlx::query_as!(
+        CategoryResponseDto,
+        r#"
+        SELECT id, name, name_ar, parent_id, notes, created_at, updated_at
+        FROM categories
+        WHERE id = $1
+        "#,
+        category_id
+    )
+    .fetch_optional(&state.pool)
+    .await
+    {
+        Ok(Some(cat)) => cat,
+        Ok(None) => {
+            let response = ApiResponse::<()>::error(
+                StatusCode::NOT_FOUND.as_u16(),
+                "Category not found".to_string(),
+            );
+            return (StatusCode::NOT_FOUND, Json(response)).into_response();
+        }
+        Err(_) => {
+            let response = ApiResponse::<()>::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                "Database error while fetching category".to_string(),
+            );
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(response)).into_response();
+        }
+    };
+
+    // 2. Merge payload values with existing category data
+    let final_name = payload.name.as_deref().unwrap_or(&old_category.name);
+    let final_name_ar = payload.name_ar.as_deref().unwrap_or(&old_category.name_ar);
+    let final_parent_id = payload.parent_id.or(old_category.parent_id);
+let final_notes = payload.notes.clone().or(old_category.notes.clone());
+
+    // 3. Early exit if no changes detected
+    if final_name == old_category.name
+        && final_name_ar == old_category.name_ar
+        && final_parent_id == old_category.parent_id
+        && final_notes == old_category.notes
+    {
+        let response = ApiResponse {
+            status: StatusCode::OK.as_u16(),
+            message: "No changes detected, category remains unchanged".to_string(),
+            data: Some(old_category),
+        };
+        return (StatusCode::OK, Json(response)).into_response();
+    }
+
+    // 4. Input validation on merged values
+    let trimmed_name = final_name.trim();
+    if trimmed_name.is_empty() {
+        let response = ApiResponse::<()>::error(
+            StatusCode::BAD_REQUEST.as_u16(),
+            "English name is required".to_string(),
+        );
+        return (StatusCode::BAD_REQUEST, Json(response)).into_response();
+    }
+
+    let trimmed_name_ar = final_name_ar.trim();
+    if trimmed_name_ar.is_empty() {
+        let response = ApiResponse::<()>::error(
+            StatusCode::BAD_REQUEST.as_u16(),
+            "Arabic name is required".to_string(),
+        );
+        return (StatusCode::BAD_REQUEST, Json(response)).into_response();
+    }
+
+    // 5. Parent category validation (using direct SQL EXISTS instead of loading all records)
+    if let Some(pid) = final_parent_id {
+        if pid == category_id {
+            let response = ApiResponse::<()>::error(
+                StatusCode::BAD_REQUEST.as_u16(),
+                "Category cannot be parent of itself".to_string(),
+            );
+            return (StatusCode::BAD_REQUEST, Json(response)).into_response();
+        }
+
+        let parent_is_valid = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM categories 
+                WHERE id = $1 AND parent_id IS NULL
+            ) AS "exists!"
+            "#,
+            pid
+        )
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(false);
+
+        if !parent_is_valid {
+            let response = ApiResponse::<()>::error(
+                StatusCode::BAD_REQUEST.as_u16(),
+                "Invalid parent category (must exist and be a top-level category)".to_string(),
+            );
+            return (StatusCode::BAD_REQUEST, Json(response)).into_response();
+        }
+    }
+
+    // 6. Execute UPDATE statement
+    let updated_category = sqlx::query_as!(
+        CategoryResponseDto,
+        r#"
+        UPDATE categories
+        SET name = $1, name_ar = $2, parent_id = $3, notes = $4, updated_at = NOW()
+        WHERE id = $5
+        RETURNING id, name, name_ar, parent_id, notes, created_at, updated_at
+        "#,
+        trimmed_name,
+        trimmed_name_ar,
+        final_parent_id,
+        final_notes,
+        category_id
+    )
+    .fetch_one(&state.pool)
+    .await;
+
+    match updated_category {
+        Ok(cat) => {
+            let response = ApiResponse {
+                status: StatusCode::OK.as_u16(),
+                message: "Category updated successfully".to_string(),
+                data: Some(cat),
+            };
+            (StatusCode::OK, Json(response)).into_response()
+        }
+        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
+            let response = ApiResponse::<()>::error(
+                StatusCode::BAD_REQUEST.as_u16(),
+                "Category name already exists".to_string(),
+            );
+            (StatusCode::BAD_REQUEST, Json(response)).into_response()
+        }
+        Err(_) => {
+            let response = ApiResponse::<()>::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                "Failed to update category in database".to_string(),
+            );
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(response)).into_response()
+        }
+    }
+}

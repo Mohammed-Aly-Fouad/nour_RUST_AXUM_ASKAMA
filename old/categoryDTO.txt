@@ -1,17 +1,17 @@
-use askama::Template;
-use askama_web::WebTemplate;
-use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
-use serde::Deserializer;
-use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+//##########################################
+//##########################################
+//##########################################
 use std::collections::HashMap;
 
-// ============================================================================
-// SECTION 1: JSON API DTOs
-// ============================================================================
+use axum::http::StatusCode;
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+use chrono::{DateTime, Utc};
+use askama::Template;
+use askama_web::WebTemplate;
+use serde::Deserializer;
 
-/// DTO لعرض بيانات الفئة (قادمة من قاعدة البيانات)
+/// 1. DTO لعرض بيانات الفئة (قادمة من قاعدة البيانات)
 #[derive(Deserialize, Serialize, FromRow, Clone)]
 pub struct CategoryResponseDto {
     pub id: i32,
@@ -23,10 +23,8 @@ pub struct CategoryResponseDto {
     pub updated_at: DateTime<Utc>,
 }
 
-// ---------------------------------------------------------------------------
-// 1.1 List Categories as Tree
-// ---------------------------------------------------------------------------
 
+//#################### TEST CLAUDE DTO FOR CATEGORY LIST TREE
 /// DTO يمثل الفئة مع فروعها بشكل متداخل (Nested Tree)
 /// يُستخدم فقط للعرض (Response) - نبنيه من CategoryResponseDto بعد جلب البيانات من DB
 #[derive(Debug, Serialize, Clone)]
@@ -95,10 +93,9 @@ impl CategoryTreeDto {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 1.2 Update Category (PATCH)
-// ---------------------------------------------------------------------------
+//#################### END TEST CLAUDE DTO FOR CATEGORY LIST TREE
 
+//#################### TEST CLAUDE DTO FOR CATEGORY UPDATE
 /// DTO الخاص بتحديث الفئة (PATCH - تحديث جزئي)
 /// كل الحقول اختيارية: لو الحقل None يعني المستخدم ما أرسله، فتبقى القيمة القديمة كما هي
 #[derive(Debug, Deserialize)]
@@ -210,11 +207,9 @@ impl<'a> MergedCategoryData<'a> {
         Ok(())
     }
 }
+//#################### END TEST CLAUDE DTO FOR CATEGORY UPDATE
 
-// ---------------------------------------------------------------------------
-// 1.3 Create Category (POST)
-// ---------------------------------------------------------------------------
-
+//#################### TEST CLAUDE DTO FOR CATEGORY CREATE
 /// DTO الخاص بإنشاء فئة جديدة (POST)
 #[derive(Debug, Deserialize)]
 pub struct CreateCategoryApiDto {
@@ -281,13 +276,11 @@ impl CreateCategoryApiDto {
         Ok(())
     }
 }
+//#################### END TEST CLAUDE DTO FOR CATEGORY CREATE
 
-// ============================================================================
-// SECTION 2: Web (HTML Forms + Askama Templates)
-// ============================================================================
+/// 2. نموذج إنشاء الفئة عبر واجهة الويب (HTML Forms)
 
-/// يحوّل حقل نموذج HTML فارغ (سلسلة نصية فارغة) إلى None بدل محاولة تحويله لرقم
-/// مفيد لأن حقول <select> أو <input> في نماذج HTML ترسل "" وليس null عند عدم الاختيار
+
 pub fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
 where
     D: Deserializer<'de>,
@@ -303,11 +296,6 @@ where
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2.1 Create Category (HTML Form)
-// ---------------------------------------------------------------------------
-
-/// نموذج إنشاء الفئة عبر واجهة الويب (HTML Forms)
 #[derive(Deserialize, Serialize)]
 pub struct CreateCategoryForm {
     pub name: String,
@@ -353,11 +341,7 @@ impl CreateCategoryForm {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2.2 Update Category (HTML Form)
-// ---------------------------------------------------------------------------
-
-/// نموذج تحديث الفئة عبر واجهة الويب (HTML Forms)
+/// 3. نموذج تحديث الفئة عبر واجهة الويب (HTML Forms)
 #[derive(Deserialize, Serialize)]
 pub struct UpdateCategoryForm {
     pub name: String,
@@ -369,9 +353,9 @@ pub struct UpdateCategoryForm {
 
 impl UpdateCategoryForm {
     pub fn validate(
-        &self,
-        current_category_id: i32,
-        existing_categories: &[CategoryResponseDto],
+        &self, 
+        current_category_id: i32, 
+        existing_categories: &[CategoryResponseDto]
     ) -> Result<(), String> {
         let trimmed_name = self.name.trim();
         if trimmed_name.is_empty() {
@@ -380,7 +364,7 @@ impl UpdateCategoryForm {
         if trimmed_name.chars().count() > 50 {
             return Err("اسم الفئة بالإنجليزية يجب ألا يتجاوز 50 حرفاً".to_string());
         }
-
+        
         let trimmed_name_ar = self.name_ar.trim();
         if trimmed_name_ar.is_empty() {
             return Err("الاسم بالعربية مطلوب ولا يمكن تركه فارغاً".to_string());
@@ -388,12 +372,12 @@ impl UpdateCategoryForm {
         if trimmed_name_ar.chars().count() > 50 {
             return Err("اسم الفئة بالعربية يجب ألا يتجاوز 50 حرفاً".to_string());
         }
-
+        
         if let Some(pid) = self.parent_id {
             if pid == current_category_id {
                 return Err("لا يمكن تعيين الفئة كأب لنفسها".to_string());
             }
-
+            
             let parent_category = existing_categories.iter().find(|cat| cat.id == pid);
             match parent_category {
                 None => {
@@ -401,33 +385,24 @@ impl UpdateCategoryForm {
                 }
                 Some(parent) => {
                     if parent.parent_id.is_some() {
-                        return Err(
-                            "لا يمكن اختيار فئة فرعية لتكون أب، يجب أن تكون الفئة الرئيسية جذعية"
-                                .to_string(),
-                        );
+                        return Err("لا يمكن اختيار فئة فرعية لتكون أب، يجب أن تكون الفئة الرئيسية جذعية".to_string());
                     }
                 }
             }
         }
-
+        
         Ok(())
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2.3 Askama Template
-// ---------------------------------------------------------------------------
 
-/// قالب الـ Askama لعرض وإدارة الفئات في صفحات الويب
+
+/// 4. قالب الـ Askama لعرض وإدارة الفئات في صفحات الويب
 #[derive(Template, WebTemplate)]
 #[template(path = "categories.html")]
 pub struct CategoryTemplate {
-    pub categories: Vec<CategoryResponseDto>,
+    pub categories: Vec<CategoryResponseDto>,              
     pub error_message: Option<String>,
-    pub success_message: Option<String>,
-    pub edit_category: Option<CategoryResponseDto>,
+    pub success_message: Option<String>, 
+    pub edit_category: Option<CategoryResponseDto>,  
 }
-
-
-
-

@@ -1,0 +1,33 @@
+pub async fn list_categories(
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let categories = sqlx::query_as!(
+        CategoryResponseDto,
+        r#"
+        SELECT id, name, name_ar, parent_id, notes, created_at, updated_at
+        FROM categories
+        ORDER BY id DESC
+        "#
+    )
+    .fetch_all(&state.pool)
+    .await;
+
+    match categories {
+        Ok(cats) => {
+            let response = ApiResponse {
+                status: StatusCode::OK.as_u16(),
+                message: "Categories retrieved successfully".to_string(),
+                data: Some(cats),
+            };
+            (StatusCode::OK, Json(response)).into_response()
+        }
+        Err(_) => {
+            let response = ApiResponse::<Vec<CategoryResponseDto>> {
+                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                message: "Internal server error occurred".to_string(),
+                data: None,
+            };
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(response)).into_response()
+        }
+    }
+}
