@@ -9,7 +9,7 @@ use sqlx::FromRow;
 // SECTION 1: JSON API DTOs
 // ============================================================================
 
-/// DTO مشترك لعرض بيانات البراند (يُستخدم في JSON API وفي قوالب Askama معًا)
+/// Shared DTO for displaying brand data (used in both the JSON API and Askama templates)
 #[derive(Debug, Serialize, FromRow, Clone)]
 pub struct BrandResponseDto {
     pub id: i32,
