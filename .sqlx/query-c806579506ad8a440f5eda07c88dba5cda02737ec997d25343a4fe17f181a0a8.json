@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, name, name_ar, notes, created_at, updated_at \n        FROM brands \n        ORDER BY id DESC\n        ",
+  "query": "\n        SELECT id, name, name_ar, parent_id, notes, created_at, updated_at\n        FROM categories\n        ORDER BY id ASC\n        ",
   "describe": {
     "columns": [
       {
@@ -20,16 +20,21 @@
       },
       {
         "ordinal": 3,
+        "name": "parent_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
         "name": "notes",
         "type_info": "Text"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -42,9 +47,10 @@
       false,
       false,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "37d75cef191df64d2253c0e81d8e9d63b93870f8f639e6ba917260597d4ed720"
+  "hash": "c806579506ad8a440f5eda07c88dba5cda02737ec997d25343a4fe17f181a0a8"
 }

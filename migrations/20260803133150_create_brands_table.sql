@@ -1,5 +1,5 @@
 -- ========================================================
--- 1. إنشاء دالة تحديث الحقل updated_at تلقائيًا (إن لم تكن موجودة)
+-- 0. Helper Functions (Must be defined first)
 -- ========================================================
 CREATE OR REPLACE FUNCTION public.update_modified_column()
 RETURNS TRIGGER AS $$
@@ -10,7 +10,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ========================================================
--- 2. إنشاء جدول Brands والقيود الخاصة به
+-- 1. Brands Table
 -- ========================================================
 CREATE TABLE IF NOT EXISTS public.brands (
     id SERIAL PRIMARY KEY,
@@ -20,16 +20,11 @@ CREATE TABLE IF NOT EXISTS public.brands (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    -- القيود الفريدة لمنع تكرار الأسماء
     CONSTRAINT unique_brand_name UNIQUE (name),
     CONSTRAINT unique_brand_name_ar UNIQUE (name_ar)
 );
 
--- ========================================================
--- 3. ربط الـ Trigger بالجدول لتشغيل الدالة عند كل UPDATE
--- ========================================================
 DROP TRIGGER IF EXISTS update_brands_modtime ON public.brands;
-
 CREATE TRIGGER update_brands_modtime
     BEFORE UPDATE ON public.brands
     FOR EACH ROW

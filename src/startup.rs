@@ -23,6 +23,9 @@ pub fn logging() {
 
 pub async fn database_connection() -> PgPool {
     tracing::debug!("Setting up database connection");
+    if let Err(e) = dotenvy::dotenv() {
+    println!("Could not load .env file: {:?}", e);
+}
     let db_url = dotenvy::var("DATABASE_URL").expect("Failed to get database url from env");
 
     let options = PgConnectOptions::from_str(&db_url)

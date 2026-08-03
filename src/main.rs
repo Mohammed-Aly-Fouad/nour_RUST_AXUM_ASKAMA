@@ -13,7 +13,6 @@ use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenvy::dotenv().ok();
     // 1. Initialize the global logging subscriber (safe against multi-threaded test panics)
     startup::logging();
     tracing::info!("Starting application boot sequence...");

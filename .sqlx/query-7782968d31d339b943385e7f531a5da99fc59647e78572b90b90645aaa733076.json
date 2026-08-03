@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n    UPDATE brands \n    SET name = $1, name_ar = $2, notes = $3, updated_at = now()\n    WHERE id = $4\n    RETURNING id, name, name_ar, notes, created_at, updated_at\n    ",
+  "query": "\n        SELECT id, name, name_ar, notes, created_at, updated_at\n        FROM brands\n        WHERE id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -36,9 +36,6 @@
     ],
     "parameters": {
       "Left": [
-        "Varchar",
-        "Varchar",
-        "Text",
         "Int4"
       ]
     },
@@ -51,5 +48,5 @@
       false
     ]
   },
-  "hash": "5eec375190fbdefa22ae432b656f827ccfc4d37952e2fdeebfe68643730eb748"
+  "hash": "7782968d31d339b943385e7f531a5da99fc59647e78572b90b90645aaa733076"
 }

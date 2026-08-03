@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT EXISTS(\n                        SELECT 1 FROM categories\n                        WHERE parent_id = $1\n                    ) AS \"exists!\"\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "78a2f1f55ad342f585d360cbe965d5f55ca465c117df58a63a50174389654ba2"
+}
