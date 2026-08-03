@@ -37,5 +37,13 @@ pub async fn database_connection() -> PgPool {
 
     tracing::debug!("Successfully connected");
 
+    // ---- تشغيل الـ migrations هنا ----
+    sqlx::migrate!("./migrations")
+        .run(&pg_pool)
+        .await
+        .expect("Failed to run database migrations");
+
+    tracing::debug!("Migrations applied successfully");
+
     pg_pool
 }

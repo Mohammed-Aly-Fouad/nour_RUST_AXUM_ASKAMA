@@ -13,6 +13,7 @@ use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::dotenv().ok();
     // 1. Initialize the global logging subscriber (safe against multi-threaded test panics)
     startup::logging();
     tracing::info!("Starting application boot sequence...");
@@ -23,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Wrap the database pool inside the shared application state
     let state = AppState { pool };
-    tracing::debug!("Application state initialized.");
+    tracing::info!("Application state initialized.");
 
     // 4. Configure CORS layers to allow cross-origin requests
     let cors = CorsLayer::new()

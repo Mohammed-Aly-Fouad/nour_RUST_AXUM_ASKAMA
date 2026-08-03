@@ -318,38 +318,15 @@ pub struct CreateCategoryForm {
 }
 
 impl CreateCategoryForm {
+    /// يفوّض التحقق لـ MergedCategoryFormData (current_category_id = None لأن
+    /// الفئة الجديدة لسه مالهاش id، فمفيش داعي للتحقق من "أب لنفسه")
     pub fn validate(&self, existing_categories: &[CategoryResponseDto]) -> Result<(), String> {
-        let trimmed_name = self.name.trim();
-        if trimmed_name.is_empty() {
-            return Err("الاسم بالإنجليزية مطلوب ولا يمكن تركه فارغاً".to_string());
-        }
-        if trimmed_name.chars().count() > 50 {
-            return Err("اسم الفئة بالإنجليزية يجب ألا يتجاوز 50 حرفاً".to_string());
-        }
-
-        let trimmed_name_ar = self.name_ar.trim();
-        if trimmed_name_ar.is_empty() {
-            return Err("الاسم بالعربية مطلوب ولا يمكن تركه فارغاً".to_string());
-        }
-        if trimmed_name_ar.chars().count() > 50 {
-            return Err("اسم الفئة بالعربية يجب ألا يتجاوز 50 حرفاً".to_string());
-        }
-
-        if let Some(pid) = self.parent_id {
-            let parent_category = existing_categories.iter().find(|cat| cat.id == pid);
-            match parent_category {
-                None => {
-                    return Err("معرف الفئة الرئيسية (Parent ID) غير موجود".to_string());
-                }
-                Some(parent) => {
-                    if parent.parent_id.is_some() {
-                        return Err("لا يمكن اختيار فئة فرعية لتكون أب لفئة جديدة، يجب أن تكون الفئة المختارة رئيسية".to_string());
-                    }
-                }
-            }
-        }
-
-        Ok(())
+        let merged = MergedCategoryFormData {
+            name: &self.name,
+            name_ar: &self.name_ar,
+            parent_id: self.parent_id,
+        };
+        merged.validate(None, existing_categories)
     }
 }
 
@@ -368,9 +345,42 @@ pub struct UpdateCategoryForm {
 }
 
 impl UpdateCategoryForm {
+    /// يفوّض التحقق لـ MergedCategoryFormData (current_category_id = Some(id)
+    /// عشان نمنع الفئة من إن تبقى أب لنفسها)
     pub fn validate(
         &self,
         current_category_id: i32,
+        existing_categories: &[CategoryResponseDto],
+    ) -> Result<(), String> {
+        let merged = MergedCategoryFormData {
+            name: &self.name,
+            name_ar: &self.name_ar,
+            parent_id: self.parent_id,
+        };
+        merged.validate(Some(current_category_id), existing_categories)
+    }
+}
+
+/// نسخة "مدموجة" من بيانات الفئة القادمة من فورم HTML (سواء إنشاء أو تعديل).
+/// نفس فكرة MergedBrandFormData بالظبط: طبقة واحدة تجمع منطق التحقق المشترك
+/// بدل ما يتكرر حرفيًا في CreateCategoryForm و UpdateCategoryForm كل على حدة.
+///
+/// هنا الفايدة حقيقية أكتر من حالة البراند: منطق التحقق من parent_id (وجوده،
+/// كونه فئة جذعية، ومنع الفئة من أن تكون أب لنفسها) كان متكرر بالحرف الواحد
+/// في الملفين - دلوقتي مكتوب مرة واحدة بس.
+pub struct MergedCategoryFormData<'a> {
+    pub name: &'a str,
+    pub name_ar: &'a str,
+    pub parent_id: Option<i32>,
+}
+
+impl<'a> MergedCategoryFormData<'a> {
+    /// current_category_id:
+    /// - None    -> حالة الإنشاء (فئة جديدة، مفيش id لسه)
+    /// - Some(id) -> حالة التعديل (نمنع الفئة من اختيار نفسها كأب)
+    pub fn validate(
+        &self,
+        current_category_id: Option<i32>,
         existing_categories: &[CategoryResponseDto],
     ) -> Result<(), String> {
         let trimmed_name = self.name.trim();
@@ -390,23 +400,22 @@ impl UpdateCategoryForm {
         }
 
         if let Some(pid) = self.parent_id {
-            if pid == current_category_id {
+            // لا يمكن للفئة أن تكون أباً لنفسها (بيسري بس وقت التعديل)
+            if Some(pid) == current_category_id {
                 return Err("لا يمكن تعيين الفئة كأب لنفسها".to_string());
             }
 
-            let parent_category = existing_categories.iter().find(|cat| cat.id == pid);
-            match parent_category {
+            match existing_categories.iter().find(|cat| cat.id == pid) {
                 None => {
                     return Err("معرف الفئة الرئيسية (Parent ID) غير موجود".to_string());
                 }
-                Some(parent) => {
-                    if parent.parent_id.is_some() {
-                        return Err(
-                            "لا يمكن اختيار فئة فرعية لتكون أب، يجب أن تكون الفئة الرئيسية جذعية"
-                                .to_string(),
-                        );
-                    }
+                Some(parent) if parent.parent_id.is_some() => {
+                    return Err(
+                        "لا يمكن اختيار فئة فرعية لتكون أب، يجب أن تكون الفئة المختارة جذعية"
+                            .to_string(),
+                    );
                 }
+                Some(_) => {}
             }
         }
 
@@ -415,17 +424,89 @@ impl UpdateCategoryForm {
 }
 
 // ---------------------------------------------------------------------------
-// 2.3 Askama Template
+// 2.3 View Model: صف جاهز للعرض في جدول الفئات
+// ---------------------------------------------------------------------------
+
+/// صف معروض في جدول الفئات - نفس بيانات CategoryResponseDto، لكن مع اسم
+/// الفئة الأب جاهز كنص (بدل ما التمبلت يدوّر عليه بنفسه بين كل الفئات).
+/// الحساب بيتم في Rust مرة واحدة وقت التحضير، عشان التمبلت يفضل "غبي" وبسيط
+/// ومحتاجش فلاتر مخصصة معقدة بتدور جوه قايمة.
+#[derive(Debug, Clone)]
+pub struct CategoryRow {
+    pub id: i32,
+    pub name: String,
+    pub name_ar: String,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    /// None  -> فئة جذعية (هتتعرض كـ badge "فئة رئيسية")
+    /// Some(name) -> اسم الفئة الأب
+    pub parent_name: Option<String>,
+}
+
+impl CategoryRow {
+    /// يحوّل قائمة مسطّحة من CategoryResponseDto إلى صفوف جاهزة للعرض.
+    /// بيحل اسم كل أب مرة واحدة عبر HashMap (O(n) بدل ما ندوّر جوه القايمة
+    /// لكل فئة على حدة وناخد O(n^2))
+    pub fn build_rows(categories: &[CategoryResponseDto]) -> Vec<CategoryRow> {
+        let id_to_name: HashMap<i32, &str> =
+            categories.iter().map(|c| (c.id, c.name.as_str())).collect();
+
+        categories
+            .iter()
+            .map(|c| CategoryRow {
+                id: c.id,
+                name: c.name.clone(),
+                name_ar: c.name_ar.clone(),
+                notes: c.notes.clone(),
+                created_at: c.created_at,
+                parent_name: c
+                    .parent_id
+                    .and_then(|pid| id_to_name.get(&pid).map(|n| n.to_string())),
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2.4 Askama Template
 // ---------------------------------------------------------------------------
 
 /// قالب الـ Askama لعرض وإدارة الفئات في صفحات الويب
 #[derive(Template, WebTemplate)]
-#[template(path = "categories.html")]
+#[template(path = "categories-fetch.html")]
 pub struct CategoryTemplate {
-    pub categories: Vec<CategoryResponseDto>,
+    /// صفوف الجدول (جاهزة للعرض، فيها اسم الأب محسوب مسبقًا)
+    pub categories: Vec<CategoryRow>,
+    /// الفئات الجذعية بس - تُستخدم لملء قائمة اختيار "الفئة الرئيسية" في الفورم
+    pub root_categories: Vec<CategoryResponseDto>,
     pub error_message: Option<String>,
     pub success_message: Option<String>,
     pub edit_category: Option<CategoryResponseDto>,
+}
+
+// ---------------------------------------------------------------------------
+// 2.5 Custom Askama filters (نفس فكرة filters بتاعة البراند، للـ avatar الملوّن)
+// ---------------------------------------------------------------------------
+
+pub mod filters {
+    use askama::Values;
+
+    #[askama::filter_fn]
+    pub fn first_letter(name: &str, _values: &dyn Values) -> askama::Result<String> {
+        Ok(name
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().to_string())
+            .unwrap_or_else(|| "?".to_string()))
+    }
+
+    #[askama::filter_fn]
+    pub fn initial_color(name: &str, _values: &dyn Values) -> askama::Result<String> {
+        const PALETTE: [&str; 6] =
+            ["#0E7C66", "#2563EB", "#D97706", "#7C3AED", "#DB2777", "#0891B2"];
+        let sum: u32 = name.bytes().map(|b| b as u32).sum();
+        Ok(PALETTE[sum as usize % PALETTE.len()].to_string())
+    }
 }
 
 

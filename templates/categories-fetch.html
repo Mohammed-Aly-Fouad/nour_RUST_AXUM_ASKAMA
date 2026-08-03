@@ -604,7 +604,7 @@
         {% if let Some(editing) = edit_category %}
           <h2>تعديل الفئة</h2>
           <p class="card-subtitle">تعديل بيانات: {{ editing.name_ar }}</p>
-          <form method="post" action="/web/categories/update/{{ editing.id }}">
+          <form method="post" action="/web/categories/update/{{ editing.id }}" class="ajax-form">
             <div class="field">
               <label for="name">الاسم بالإنجليزية</label>
               <input type="text" id="name" name="name" value="{{ editing.name }}" maxlength="50" required>
@@ -633,13 +633,13 @@
             </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
-              <a href="/web/categories" class="btn btn-ghost">إلغاء</a>
+              <a href="/web/categories" class="btn btn-ghost ajax-link">إلغاء</a>
             </div>
           </form>
         {% else %}
           <h2>إنشاء فئة جديدة</h2>
           <p class="card-subtitle">أدخل اسم الفئة بالإنجليزية والعربية.</p>
-          <form method="post" action="/web/categories">
+          <form method="post" action="/web/categories" class="ajax-form">
             <div class="field">
               <label for="name">الاسم بالإنجليزية</label>
               <input type="text" id="name" name="name" placeholder="e.g. Shoes" maxlength="50" required>
@@ -719,8 +719,8 @@
                   <td class="date-cell">{{ cat.created_at.format("%Y-%m-%d") }}</td>
                   <td>
                     <div class="row-actions">
-                      <a href="/web/categories/edit/{{ cat.id }}" class="btn btn-edit-link">تعديل</a>
-                      <form method="post" action="/web/categories/delete/{{ cat.id }}" onsubmit="return confirm('هل أنت متأكد من حذف هذه الفئة؟');">
+                      <a href="/web/categories/edit/{{ cat.id }}" class="btn btn-edit-link ajax-link">تعديل</a>
+                      <form method="post" action="/web/categories/delete/{{ cat.id }}" class="ajax-delete-form" data-confirm="هل أنت متأكد من حذف هذه الفئة؟">
                         <button type="submit" class="btn btn-danger-link">حذف</button>
                       </form>
                     </div>
@@ -737,25 +737,132 @@
   </main>
 
   <script>
-    function dismissToast(btn) {
-      const toast = btn.closest('[data-toast]');
-      if (!toast) return;
-      toast.classList.add('toast-hide');
-      setTimeout(() => toast.remove(), 200);
+    /*
+     * ==========================================================================
+     * AJAX Navigation Layer
+     * ==========================================================================
+     * السيرفر نفسه مبيتغيرش خالص: لسه بيرجّع نفس الـ HTML الكامل اللي كان
+     * بيرجّعه دايمًا (سواء بعد Redirect للنجاح، أو صفحة فيها error_message
+     * وقت الفشل). إحنا هنا بس بنعترض الفورمز/اللينكات، نبعت الطلب بـ fetch
+     * بدل ما نخلي المتصفح يعمل navigation كامل، وبعدين نستبدل جزء
+     * ".layout" و "#toast-container" بس من الصفحة الجديدة، من غير ما نعيد
+     * تحميل باقي الصفحة (السايدبار، الخطوط، CSS...).
+     *
+     * لو الـ fetch فشل لأي سبب (مشكلة شبكة مثلاً)، بنرجع تلقائيًا لسلوك
+     * المتصفح الطبيعي (navigation حقيقي) عشان الصفحة تفضل شغالة دايمًا.
+     */
+
+    function initToasts(container) {
+      if (!container) return;
+      container.querySelectorAll('[data-toast]:not([data-toast-init])').forEach((toast) => {
+        toast.dataset.toastInit = '1';
+
+        const dismiss = () => {
+          toast.classList.add('toast-hide');
+          setTimeout(() => toast.remove(), 200);
+        };
+
+        const closeBtn = toast.querySelector('.toast-close');
+        if (closeBtn) closeBtn.addEventListener('click', dismiss);
+
+        setTimeout(dismiss, 5000);
+      });
     }
 
-    document.querySelectorAll('[data-toast]').forEach((toast) => {
-      setTimeout(() => {
-        toast.classList.add('toast-hide');
-        setTimeout(() => toast.remove(), 200);
-      }, 5000);
+    function updateAddressBar(rawUrl) {
+      try {
+        const url = new URL(rawUrl, window.location.origin);
+        // مسح ?ok=... بعد عرض رسالة النجاح، عشان الـ Refresh ميرجعش نفس الرسالة تاني
+        url.searchParams.delete('ok');
+        window.history.pushState({ ajax: true }, '', url.pathname + url.search);
+      } catch (e) {
+        /* تجاهل لو الرابط مش قابل للتحليل */
+      }
+    }
+
+    function swapDom(html) {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+
+      const newLayout = doc.querySelector('.layout');
+      const currentLayout = document.querySelector('.layout');
+      if (newLayout && currentLayout) currentLayout.replaceWith(newLayout);
+
+      const newToasts = doc.querySelector('#toast-container');
+      const currentToasts = document.querySelector('#toast-container');
+      if (newToasts && currentToasts) currentToasts.replaceWith(newToasts);
+
+      initToasts(document.querySelector('#toast-container'));
+    }
+
+    function scrollToForm() {
+      const formCard = document.querySelector('.layout .card:first-child');
+      if (!formCard) return;
+      formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function ajaxNavigate(url, options, opts) {
+      opts = opts || {};
+      try {
+        const res = await fetch(url, options);
+        const html = await res.text();
+        swapDom(html);
+        updateAddressBar(res.url || url);
+        if (opts.scrollToForm) scrollToForm();
+      } catch (err) {
+        console.error('تعذّر الاتصال بالسيرفر، سيتم تحميل الصفحة بالطريقة العادية', err);
+        // Fallback: navigation حقيقي لو الشبكة فشلت
+        window.location.href = url;
+      }
+    }
+
+    // ---------- اعتراض إرسال الفورمز (إنشاء / تعديل / حذف) ----------
+    document.addEventListener('submit', function (e) {
+      const form = e.target;
+
+      if (form.matches('.ajax-delete-form')) {
+        e.preventDefault();
+        const msg = form.dataset.confirm || 'هل أنت متأكد؟';
+        if (!window.confirm(msg)) return;
+
+        ajaxNavigate(form.action, {
+          method: 'POST',
+          body: new URLSearchParams(new FormData(form)),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        return;
+      }
+
+      if (form.matches('.ajax-form')) {
+        e.preventDefault();
+        ajaxNavigate(form.action, {
+          method: form.method || 'POST',
+          body: new URLSearchParams(new FormData(form)),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+      }
     });
 
-    // مسح ?edit=... / ?ok=... من شريط العنوان بعد عرض الرسالة، عشان لو المستخدم
-    // عمل Refresh بعد كده، السيرفر ميرجعش نفس رسالة النجاح تاني.
-    if (window.location.search) {
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
+    // ---------- اعتراض الضغط على لينكات "تعديل" / "إلغاء" ----------
+    document.addEventListener('click', function (e) {
+      const link = e.target.closest('a.ajax-link');
+      if (!link) return;
+      e.preventDefault();
+      const isEditLink = link.classList.contains('btn-edit-link');
+      ajaxNavigate(link.href, { method: 'GET' }, { scrollToForm: isEditLink });
+    });
+
+    // ---------- دعم زر الرجوع/التقديم في المتصفح ----------
+    window.addEventListener('popstate', function () {
+      ajaxNavigate(window.location.href, { method: 'GET' });
+    });
+
+    // ---------- تشغيل التوست الموجود وقت أول تحميل للصفحة ----------
+    initToasts(document.querySelector('#toast-container'));
+
+    // مسح ?ok=... من شريط العنوان لو الصفحة اتفتحت مباشرة بيها (بعد Redirect حقيقي
+    // من غير JS، مثلاً fallback network error)
+    if (window.location.search.includes('ok=')) {
+      updateAddressBar(window.location.href);
     }
   </script>
 

@@ -1,0 +1,19 @@
+method: get
+url: http://localhost:3000/dashboard
+parameters:
+  header:
+    - name: Key
+      value: Authorization
+    - name: Value
+      value: Bearer
+        eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTQyIiwiZXhwIjoxNzg1NjkwMjQyfQ.pSPyfjvoA7t8a-mabVEijCUMyjH2iYLrPjqGPWKKrG8
+auth:
+  type: bearer
+  bearer:
+    token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTQyIiwiZXhwIjoxNzg1NjkwMDk2fQ.39JgvARn3g5V8xQie_BH61YA-p3pmdaqLZkHrJBipN0
+  jwt:
+    algorithm: HS256
+    secret: '"token":
+      "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTQyIiwiZXhwIjoxNzg1Njg5OTIzfQ.sFBohyuzi18I7sl2U7RqBZF6B8BmjNHEHiwnWYlevgc"}'
+    isSecretBase64Encoded: false
+    addTokenTo: header

@@ -5,157 +5,259 @@ use axum::{
     Router,
 };
 use serde::Deserialize;
-use crate::{
-    domain::category::dto::{CategoryResponseDto, CategoryTemplate, CreateCategoryForm, UpdateCategoryForm}, state::AppState,
-};
 
-#[derive(Deserialize)]
-pub struct EditQuery {
-    pub edit: Option<i32>,
-    pub error: Option<String>,
-    pub success: Option<String>,
-}
+use crate::domain::category::dto::{
+    CategoryResponseDto, CategoryRow, CategoryTemplate, CreateCategoryForm, UpdateCategoryForm,
+};
+use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        // GET /categories -> List all categories or load edit mode
-        .route("/", get(list_or_edit_categories_handler))
-        // POST /categories -> Create a new category
-        .route("/", post(create_category_handler))
-        // POST /categories/{id}/update -> Update existing category via HTML form POST
-        .route("/{id}/update", post(update_category_handler))
-        // POST /categories/{id}/delete -> Delete category via HTML form POST
-        .route("/{id}/delete", post(delete_category_handler))
+        .route("/", get(render_categories_page).post(create_category_web))
+        .route("/edit/{id}", get(edit_category_page))
+        .route("/update/{id}", post(update_category_web))
+        .route("/delete/{id}", post(delete_category_web))
 }
 
-// دالة عرض الصفحة الرئيسية (قائمة الفئات + نموذج الإنشاء أو التعديل)
-pub async fn list_or_edit_categories_handler(
-    State(state): State<AppState>,
-    Query(query): Query<EditQuery>,
-) -> impl IntoResponse {
-    let pool = &state.pool;
-    let categories = match sqlx::query_as::<_, CategoryResponseDto>(
-        "SELECT id, name, name_ar, parent_id, notes, created_at, updated_at FROM categories ORDER BY id DESC"
+#[derive(Debug, Deserialize)]
+pub struct FlashParams {
+    pub ok: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async fn fetch_all_categories(state: &AppState) -> Vec<CategoryResponseDto> {
+    sqlx::query_as::<_, CategoryResponseDto>(
+        "SELECT id, name, name_ar, parent_id, notes, created_at, updated_at
+         FROM categories ORDER BY id DESC",
     )
-    .fetch_all(pool)
-    .await {
-        Ok(cats) => cats,
-        Err(_) => vec![],
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default()
+}
+
+async fn fetch_category_by_id(state: &AppState, id: i32) -> Option<CategoryResponseDto> {
+    sqlx::query_as::<_, CategoryResponseDto>(
+        "SELECT id, name, name_ar, parent_id, notes, created_at, updated_at
+         FROM categories WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await
+    .unwrap_or(None)
+}
+
+/// الفئات الجذعية بس (لملء قائمة اختيار "الفئة الرئيسية")
+/// exclude_id: نستبعد بيه الفئة الحالية وقت التعديل (فئة ميقدرش تبقى أب لنفسها)
+fn build_root_categories(
+    categories: &[CategoryResponseDto],
+    exclude_id: Option<i32>,
+) -> Vec<CategoryResponseDto> {
+    categories
+        .iter()
+        .filter(|c| c.parent_id.is_none() && Some(c.id) != exclude_id)
+        .cloned()
+        .collect()
+}
+
+fn is_unique_violation(err: &sqlx::Error) -> bool {
+    matches!(err, sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("23505"))
+}
+
+fn is_foreign_key_violation(err: &sqlx::Error) -> bool {
+    matches!(err, sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("23503"))
+}
+
+// ==================== 1. Render main page ====================
+
+pub async fn render_categories_page(
+    State(state): State<AppState>,
+    Query(params): Query<FlashParams>,
+) -> CategoryTemplate {
+    let success_message = match params.ok.as_deref() {
+        Some("created") => Some("تم إنشاء الفئة بنجاح".to_string()),
+        Some("updated") => Some("تم تحديث الفئة بنجاح".to_string()),
+        Some("deleted") => Some("تم حذف الفئة بنجاح".to_string()),
+        _ => None,
     };
 
-    let edit_category = if let Some(edit_id) = query.edit {
-        categories.iter().find(|c| c.id == edit_id).cloned()
-    } else {
-        None
-    };
+    let all = fetch_all_categories(&state).await;
+    CategoryTemplate {
+        root_categories: build_root_categories(&all, None),
+        categories: CategoryRow::build_rows(&all),
+        error_message: None,
+        success_message,
+        edit_category: None,
+    }
+}
+
+// ==================== 2. Create Category ====================
+
+pub async fn create_category_web(
+    State(state): State<AppState>,
+    Form(form): Form<CreateCategoryForm>,
+) -> axum::response::Response {
+    let all = fetch_all_categories(&state).await;
+
+    if let Err(err_msg) = form.validate(&all) {
+        return CategoryTemplate {
+            root_categories: build_root_categories(&all, None),
+            categories: CategoryRow::build_rows(&all),
+            error_message: Some(err_msg),
+            success_message: None,
+            edit_category: None,
+        }
+        .into_response();
+    }
+
+    let result = sqlx::query(
+        "INSERT INTO categories (name, name_ar, parent_id, notes, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())",
+    )
+    .bind(form.name.trim())
+    .bind(form.name_ar.trim())
+    .bind(form.parent_id)
+    .bind(&form.notes)
+    .execute(&state.pool)
+    .await;
+
+    match result {
+        Ok(_) => Redirect::to("/web/categories?ok=created").into_response(),
+        Err(e) => {
+            let all = fetch_all_categories(&state).await;
+            let msg = if is_unique_violation(&e) {
+                "اسم الفئة موجود بالفعل".to_string()
+            } else {
+                "حدث خطأ أثناء إضافة الفئة، حاول مرة أخرى".to_string()
+            };
+            CategoryTemplate {
+                root_categories: build_root_categories(&all, None),
+                categories: CategoryRow::build_rows(&all),
+                error_message: Some(msg),
+                success_message: None,
+                edit_category: None,
+            }
+            .into_response()
+        }
+    }
+}
+
+// ==================== 3. Edit page (GET) ====================
+
+pub async fn edit_category_page(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> CategoryTemplate {
+    let all = fetch_all_categories(&state).await;
+    let edit_category = all.iter().find(|c| c.id == id).cloned();
 
     CategoryTemplate {
-        categories,
-        error_message: query.error,
-        success_message: query.success,
+        root_categories: build_root_categories(&all, Some(id)),
+        categories: CategoryRow::build_rows(&all),
+        error_message: None,
+        success_message: None,
         edit_category,
     }
 }
 
-// دالة معالجة إنشاء فئة جديدة
-pub async fn create_category_handler(
+// ==================== 4. Update Category ====================
+
+pub async fn update_category_web(
     State(state): State<AppState>,
-    Form(form): Form<CreateCategoryForm>,
-) -> impl IntoResponse {
-     let pool = &state.pool;
-    let existing_categories = match sqlx::query_as::<_, CategoryResponseDto>(
-        "SELECT id, name, name_ar, parent_id, notes, created_at, updated_at FROM categories"
-    )
-    .fetch_all(pool)
-    .await {
-        Ok(cats) => cats,
-        Err(_) => vec![],
-    };
-
-    if let Err(err_msg) = form.validate(&existing_categories) {
-        let encoded_err = urlencoding::encode(&err_msg);
-        return Redirect::to(&format!("/web/categories?error={}", encoded_err));
-    }
-
-    let result = sqlx::query(
-        "INSERT INTO categories (name, name_ar, parent_id, notes, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())"
-    )
-    .bind(&form.name)
-    .bind(&form.name_ar)
-    .bind(form.parent_id)
-    .bind(&form.notes)
-    .execute(pool)
-    .await;
-
-    match result {
-        Ok(_) => Redirect::to("/web/categories?success=تم إنشاء الفئة بنجاح"),
-        Err(e) => {
-           let error_string = format!("خطأ في قاعدة البيانات: {}", e);
-let err_msg = urlencoding::encode(&error_string);
-            Redirect::to(&format!("/web/categories?error={}", err_msg))
-        }
-    }
-}
-
-// دالة معالجة تحديث فئة موجودة
-pub async fn update_category_handler(
-     State(state): State<AppState>,
     Path(id): Path<i32>,
     Form(form): Form<UpdateCategoryForm>,
-) -> impl IntoResponse {
-     let pool = &state.pool;
-    let existing_categories = match sqlx::query_as::<_, CategoryResponseDto>(
-        "SELECT id, name, name_ar, parent_id, notes, created_at, updated_at FROM categories"
-    )
-    .fetch_all(pool)
-    .await {
-        Ok(cats) => cats,
-        Err(_) => vec![],
+) -> axum::response::Response {
+    let all = fetch_all_categories(&state).await;
+
+    let old_category = match all.iter().find(|c| c.id == id).cloned() {
+        Some(c) => c,
+        None => {
+            return CategoryTemplate {
+                root_categories: build_root_categories(&all, Some(id)),
+                categories: CategoryRow::build_rows(&all),
+                error_message: Some("الفئة غير موجودة".to_string()),
+                success_message: None,
+                edit_category: None,
+            }
+            .into_response();
+        }
     };
 
-    if let Err(err_msg) = form.validate(id, &existing_categories) {
-        let encoded_err = urlencoding::encode(&err_msg);
-        return Redirect::to(&format!("/web/categories?edit={}&error={}", id, encoded_err));
+    if let Err(err_msg) = form.validate(id, &all) {
+        return CategoryTemplate {
+            root_categories: build_root_categories(&all, Some(id)),
+            categories: CategoryRow::build_rows(&all),
+            error_message: Some(err_msg),
+            success_message: None,
+            edit_category: Some(old_category),
+        }
+        .into_response();
     }
 
     let result = sqlx::query(
-        "UPDATE categories SET name = $1, name_ar = $2, parent_id = $3, notes = $4, updated_at = NOW() WHERE id = $5"
+        "UPDATE categories
+         SET name = $1, name_ar = $2, parent_id = $3, notes = $4, updated_at = NOW()
+         WHERE id = $5",
     )
-    .bind(&form.name)
-    .bind(&form.name_ar)
+    .bind(form.name.trim())
+    .bind(form.name_ar.trim())
     .bind(form.parent_id)
     .bind(&form.notes)
     .bind(id)
-    .execute(pool)
+    .execute(&state.pool)
     .await;
 
     match result {
-        Ok(_) => Redirect::to("/web/categories?success=تم تحديث الفئة بنجاح"),
+        Ok(_) => Redirect::to("/web/categories?ok=updated").into_response(),
         Err(e) => {
-           let error_string = format!("فشل التحديث: {}", e);
-let err_msg = urlencoding::encode(&error_string);
-            Redirect::to(&format!("/web/categories?edit={}&error={}", id, err_msg))
+            let all = fetch_all_categories(&state).await;
+            let msg = if is_unique_violation(&e) {
+                "اسم الفئة موجود بالفعل".to_string()
+            } else {
+                "حدث خطأ أثناء تحديث الفئة، حاول مرة أخرى".to_string()
+            };
+            CategoryTemplate {
+                root_categories: build_root_categories(&all, Some(id)),
+                categories: CategoryRow::build_rows(&all),
+                error_message: Some(msg),
+                success_message: None,
+                edit_category: Some(old_category),
+            }
+            .into_response()
         }
     }
 }
 
-// دالة حذف الفئة
-pub async fn delete_category_handler(
+// ==================== 5. Delete Category ====================
+
+pub async fn delete_category_web(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-) -> impl IntoResponse {
-     let pool = &state.pool;
+) -> axum::response::Response {
     let result = sqlx::query("DELETE FROM categories WHERE id = $1")
         .bind(id)
-        .execute(pool)
+        .execute(&state.pool)
         .await;
 
     match result {
-        Ok(_) => Redirect::to("/web/categories?success=تم حذف الفئة بنجاح"),
+        Ok(_) => Redirect::to("/web/categories?ok=deleted").into_response(),
         Err(e) => {
-           let error_string = format!("لا يمكن حذف الفئة: {}", e);
-let err_msg = urlencoding::encode(&error_string);
-            Redirect::to(&format!("/web/categories?error={}", err_msg))
+            let all = fetch_all_categories(&state).await;
+            let msg = if is_foreign_key_violation(&e) {
+                "لا يمكن حذف هذه الفئة لأنها مرتبطة بفئات فرعية أو منتجات. قم بإزالتها أو نقلها أولاً.".to_string()
+            } else {
+                "حدث خطأ أثناء حذف الفئة".to_string()
+            };
+            CategoryTemplate {
+                root_categories: build_root_categories(&all, None),
+                categories: CategoryRow::build_rows(&all),
+                error_message: Some(msg),
+                success_message: None,
+                edit_category: None,
+            }
+            .into_response()
         }
     }
 }
