@@ -1,5 +1,5 @@
 -- ========================================================
--- 2. Categories Table
+-- 2. Categories Table (Fixed & Optimized)
 -- ========================================================
 CREATE TABLE IF NOT EXISTS public.categories (
     id SERIAL PRIMARY KEY,
@@ -10,9 +10,10 @@ CREATE TABLE IF NOT EXISTS public.categories (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT unique_english_name UNIQUE (name),
-    CONSTRAINT unique_arabic_name UNIQUE (name_ar),
-    CONSTRAINT unique_name_per_parent UNIQUE (name, parent_id),
+    -- Ensures names are unique within the same parent branch 
+    -- NULLS NOT DISTINCT ensures top-level categories (parent_id = NULL) are also checked
+    CONSTRAINT unique_en_name_per_parent UNIQUE NULLS NOT DISTINCT (name, parent_id),
+    CONSTRAINT unique_ar_name_per_parent UNIQUE NULLS NOT DISTINCT (name_ar, parent_id),
 
     CONSTRAINT categories_parent_id_fkey 
         FOREIGN KEY (parent_id) 

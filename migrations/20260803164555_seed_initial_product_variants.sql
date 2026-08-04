@@ -95,4 +95,8 @@ ON CONFLICT (id) DO NOTHING;
 -- ========================================================
 -- إعادة ضبط الـ Sequence لجدول Product Variants
 -- ========================================================
-SELECT setval(pg_get_serial_sequence('public.product_variants', 'id'), COALESCE(MAX(id), 1)) FROM public.product_variants;
+SELECT setval(
+    pg_get_serial_sequence('public.brands', 'id'), 
+    COALESCE(MAX(id), 1),
+    (MAX(id) IS NOT NULL) -- sets is_called to false if the table is empty
+) FROM public.product_variants;

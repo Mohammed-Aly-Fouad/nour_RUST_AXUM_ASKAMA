@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS public.product_variants (
     CONSTRAINT fk_product_variants_product 
         FOREIGN KEY (product_id)
         REFERENCES public.products (id)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
+         ON DELETE RESTRICT 
+        ON UPDATE CASCADE,
 
     CONSTRAINT fk_product_variants_brand 
         FOREIGN KEY (brand_id)

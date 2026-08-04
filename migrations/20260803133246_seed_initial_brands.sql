@@ -58,4 +58,9 @@ INSERT INTO public.brands (id, name, name_ar, notes) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. خطوة حاسمة: تعديل الـ Sequence لكي يبدأ من أخر ID أدخلناه (58 + 1 = 59)
-SELECT setval(pg_get_serial_sequence('public.brands', 'id'), COALESCE(MAX(id), 1)) FROM public.brands;
+SELECT setval(
+    pg_get_serial_sequence('public.brands', 'id'), 
+    COALESCE(MAX(id), 1),
+    (MAX(id) IS NOT NULL) -- sets is_called to false if the table is empty
+) 
+FROM public.brands;

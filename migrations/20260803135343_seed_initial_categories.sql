@@ -32,4 +32,8 @@ INSERT INTO public.categories (id, name, name_ar, parent_id, notes) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. تعديل الـ Sequence ليكون جاهزاً للـ IDs القادمة (أعلى رقم حالياً هو 802)
-SELECT setval(pg_get_serial_sequence('public.categories', 'id'), COALESCE(MAX(id), 1)) FROM public.categories;
+SELECT setval(
+    pg_get_serial_sequence('public.brands', 'id'), 
+    COALESCE(MAX(id), 1),
+    (MAX(id) IS NOT NULL) -- sets is_called to false if the table is empty
+) FROM public.categories;
