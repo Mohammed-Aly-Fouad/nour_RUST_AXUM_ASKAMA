@@ -1,5 +1,5 @@
 -- ========================================================
--- 2. Categories Table (Fixed & Optimized)
+-- 2. Categories Table
 -- ========================================================
 CREATE TABLE IF NOT EXISTS public.categories (
     id SERIAL PRIMARY KEY,
@@ -10,19 +10,25 @@ CREATE TABLE IF NOT EXISTS public.categories (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    -- Ensures names are unique within the same parent branch 
-    -- NULLS NOT DISTINCT ensures top-level categories (parent_id = NULL) are also checked
-    CONSTRAINT unique_en_name_per_parent UNIQUE NULLS NOT DISTINCT (name, parent_id),
-    CONSTRAINT unique_ar_name_per_parent UNIQUE NULLS NOT DISTINCT (name_ar, parent_id),
-
-    CONSTRAINT categories_parent_id_fkey 
+    -- Foreign Key Constraint
+    CONSTRAINT fk_categories_parent
         FOREIGN KEY (parent_id) 
         REFERENCES public.categories (id) 
         ON DELETE RESTRICT 
         ON UPDATE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON public.categories (parent_id);
+-- Foreign key lookup index
+CREATE INDEX IF NOT EXISTS idx_categories_parent_id 
+    ON public.categories (parent_id);
+
+-- Case-Insensitive Unique Indexes (Per Parent)
+-- Uses NULLS NOT DISTINCT (PostgreSQL 15+) so top-level categories (parent_id IS NULL) are also strictly checked
+CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_unique_name_parent_lower 
+    ON public.categories (LOWER(name), parent_id) NULLS NOT DISTINCT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_unique_name_ar_parent_lower 
+    ON public.categories (LOWER(name_ar), parent_id) NULLS NOT DISTINCT;
 
 -- Enforce 2-Level Depth Limit Function & Trigger
 CREATE OR REPLACE FUNCTION public.check_category_depth()
@@ -46,6 +52,7 @@ CREATE TRIGGER enforce_category_depth
     FOR EACH ROW
     EXECUTE FUNCTION public.check_category_depth();
 
+-- Updated-at trigger
 DROP TRIGGER IF EXISTS update_categories_modtime ON public.categories;
 CREATE TRIGGER update_categories_modtime
     BEFORE UPDATE ON public.categories
