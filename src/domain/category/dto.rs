@@ -8,10 +8,38 @@ use sqlx::FromRow;
 use std::collections::HashMap;
 
 // ============================================================================
+// HELPERS FOR DESERIALIZATION
+// ============================================================================
+
+/// يحوّل حقل رقمي فارغ (سلسلة نصية فارغة "") من HTML Form إلى None
+pub fn empty_number_as_none<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    match opt {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => match s.parse::<i32>() {
+            Ok(v) => Ok(Some(v)),
+            Err(e) => Err(serde::de::Error::custom(e)),
+        },
+    }
+}
+
+/// يحوّل حقل ملاحظات نصي فارغ "" من HTML Form إلى None
+pub fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    Ok(opt.filter(|s| !s.trim().is_empty()))
+}
+
+// ============================================================================
 // SECTION 1: JSON API DTOs
 // ============================================================================
 
-/// DTO لعرض بيانات الفئة (قادمة من قاعدة البيانات)
 #[derive(Deserialize, Serialize, FromRow, Clone)]
 pub struct CategoryResponseDto {
     pub id: i32,
@@ -23,12 +51,6 @@ pub struct CategoryResponseDto {
     pub updated_at: DateTime<Utc>,
 }
 
-// ---------------------------------------------------------------------------
-// 1.1 List Categories as Tree
-// ---------------------------------------------------------------------------
-
-/// DTO يمثل الفئة مع فروعها بشكل متداخل (Nested Tree)
-/// يُستخدم فقط للعرض (Response) - نبنيه من CategoryResponseDto بعد جلب البيانات من DB
 #[derive(Debug, Serialize, Clone)]
 pub struct CategoryTreeDto {
     pub id: i32,
@@ -41,7 +63,6 @@ pub struct CategoryTreeDto {
 }
 
 impl CategoryTreeDto {
-    /// يبني من CategoryResponseDto واحدة (بدون أطفال بعد)
     fn from_flat(cat: &CategoryResponseDto) -> Self {
         CategoryTreeDto {
             id: cat.id,
@@ -54,10 +75,7 @@ impl CategoryTreeDto {
         }
     }
 
-    /// يحوّل قائمة مسطّحة (flat list) من الفئات إلى شجرة متداخلة
-    /// الخوارزمية: O(n) - مرة واحدة لتجميع الأبناء حسب parent_id، ومرة لبناء الشجرة
     pub fn build_tree(flat_categories: Vec<CategoryResponseDto>) -> Vec<CategoryTreeDto> {
-        // 1. تجميع كل فئة تحت parent_id الخاص بها
         let mut children_map: HashMap<i32, Vec<&CategoryResponseDto>> = HashMap::new();
         let mut roots: Vec<&CategoryResponseDto> = Vec::new();
 
@@ -68,16 +86,12 @@ impl CategoryTreeDto {
             }
         }
 
-        // 2. بناء الشجرة بدءًا من الفئات الجذعية (roots)
         roots
             .into_iter()
             .map(|root| Self::build_node(root, &children_map))
             .collect()
     }
 
-    /// يبني عقدة واحدة (فئة) مع كل أبنائها بشكل تعاودي (recursive)
-    /// ملاحظة: بما أن الهيكل عندك مستواه اثنين فقط (أب/فرع)،
-    /// الاستدعاء التعاودي هنا آمن ولن يسبب حلقة لا نهائية
     fn build_node(
         cat: &CategoryResponseDto,
         children_map: &HashMap<i32, Vec<&CategoryResponseDto>>,
@@ -95,12 +109,6 @@ impl CategoryTreeDto {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 1.2 Update Category (PATCH)
-// ---------------------------------------------------------------------------
-
-/// DTO الخاص بتحديث الفئة (PATCH - تحديث جزئي)
-/// كل الحقول اختيارية: لو الحقل None يعني المستخدم ما أرسله، فتبقى القيمة القديمة كما هي
 #[derive(Debug, Deserialize)]
 pub struct UpdateCategoryApiDto {
     pub name: Option<String>,
@@ -109,8 +117,6 @@ pub struct UpdateCategoryApiDto {
     pub notes: Option<String>,
 }
 
-/// نسخة "مدموجة" تمثل القيم النهائية بعد دمج الجديد مع القديم
-/// نستخدمها كمدخل موحّد لدالة الـ validate بدل تمرير حقول متفرقة
 pub struct MergedCategoryData<'a> {
     pub name: &'a str,
     pub name_ar: &'a str,
@@ -118,10 +124,6 @@ pub struct MergedCategoryData<'a> {
 }
 
 impl<'a> MergedCategoryData<'a> {
-    /// يتحقق من صحة البيانات النهائية بعد الدمج
-    /// current_category_id: لمنع الفئة من أن تكون أب لنفسها، وللتحقق من وجود فروع تابعة لها
-    /// old_parent_id: قيمة parent_id القديمة (قبل التعديل) - نحتاجها لمعرفة هل فعلاً نغيّر الفئة من "أب" إلى "ابن"
-    /// نستخدم استعلامات DB مباشرة (EXISTS) بدل تحميل كل الفئات - أفضل أداءً
     pub async fn validate(
         &self,
         current_category_id: i32,
@@ -156,8 +158,51 @@ impl<'a> MergedCategoryData<'a> {
             ));
         }
 
+        // 🎯 فحص تكرار الاسم بالإنجليزية عبر SQL (Async API)
+        let name_exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM categories
+                WHERE LOWER(TRIM(name)) = LOWER($1) AND id != $2
+            ) AS "exists!"
+            "#,
+            trimmed_name,
+            current_category_id
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if name_exists {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "اسم الفئة بالإنجليزية موجود بالفعل".to_string(),
+            ));
+        }
+
+        // 🎯 فحص تكرار الاسم بالعربية عبر SQL (Async API)
+        let name_ar_exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM categories
+                WHERE TRIM(name_ar) = $1 AND id != $2
+            ) AS "exists!"
+            "#,
+            trimmed_name_ar,
+            current_category_id
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if name_ar_exists {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "اسم الفئة بالعربية موجود بالفعل".to_string(),
+            ));
+        }
+
         if let Some(pid) = self.parent_id {
-            // 1. لا يمكن للفئة أن تكون أباً لنفسها
             if pid == current_category_id {
                 return Err((
                     StatusCode::BAD_REQUEST,
@@ -165,7 +210,6 @@ impl<'a> MergedCategoryData<'a> {
                 ));
             }
 
-            // 2. الأب المُختار يجب أن يكون موجوداً وأن يكون فئة جذعية (parent_id = NULL)
             let parent_is_valid = sqlx::query_scalar!(
                 r#"
                 SELECT EXISTS(
@@ -180,12 +224,10 @@ impl<'a> MergedCategoryData<'a> {
             .unwrap_or(false);
 
             if !parent_is_valid {
-                let msg = "معرف الفئة الرئيسية غير موجود، أو أنها ليست فئة جذعية (لا يمكن اختيار فئة فرعية كأب)".to_string();
+                let msg = "معرف الفئة الرئيسية غير موجود، أو أنها ليست فئة جذعية".to_string();
                 return Err((StatusCode::BAD_REQUEST, msg));
             }
 
-            // 3. لو الفئة كانت "جذعية" (أب) قبل التعديل، وصار عندها الآن أب جديد (تتحول لفئة فرعية)
-            //    نتأكد ما عندها فئات فرعية تابعة لها، لأن هذا يسبب تعارض في الهيكل (فرع يتبع لفرع)
             if old_parent_id.is_none() {
                 let has_children = sqlx::query_scalar!(
                     r#"
@@ -201,7 +243,7 @@ impl<'a> MergedCategoryData<'a> {
                 .unwrap_or(false);
 
                 if has_children {
-                    let msg = "لا يمكن تحويل هذه الفئة إلى فئة فرعية لأن لديها فئات فرعية تابعة لها. يجب نقل أو حذف الفئات الفرعية التابعة أولاً".to_string();
+                    let msg = "لا يمكن تحويل هذه الفئة إلى فئة فرعية لأن لديها فئات فرعية تابعة لها".to_string();
                     return Err((StatusCode::BAD_REQUEST, msg));
                 }
             }
@@ -211,11 +253,6 @@ impl<'a> MergedCategoryData<'a> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 1.3 Create Category (POST)
-// ---------------------------------------------------------------------------
-
-/// DTO الخاص بإنشاء فئة جديدة (POST)
 #[derive(Debug, Deserialize)]
 pub struct CreateCategoryApiDto {
     pub name: String,
@@ -225,9 +262,6 @@ pub struct CreateCategoryApiDto {
 }
 
 impl CreateCategoryApiDto {
-    /// يتحقق من صحة البيانات المُرسلة لإنشاء فئة جديدة
-    /// نستخدم استعلام DB مباشر (EXISTS) بدل تحميل كل الفئات - أفضل أداءً،
-    /// وخصوصًا هنا لأننا لا نحتاج أي بيانات أخرى غير التحقق من صلاحية الأب
     pub async fn validate(&self, pool: &sqlx::PgPool) -> Result<(), (StatusCode, String)> {
         let trimmed_name = self.name.trim();
         if trimmed_name.is_empty() {
@@ -257,8 +291,49 @@ impl CreateCategoryApiDto {
             ));
         }
 
+        // 🎯 فحص تكرار الاسم بالإنجليزية عند الإنشاء (API)
+        let name_exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM categories
+                WHERE LOWER(TRIM(name)) = LOWER($1)
+            ) AS "exists!"
+            "#,
+            trimmed_name
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if name_exists {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "English category name already exists".to_string(),
+            ));
+        }
+
+        // 🎯 فحص تكرار الاسم بالعربية عند الإنشاء (API)
+        let name_ar_exists = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM categories
+                WHERE TRIM(name_ar) = $1
+            ) AS "exists!"
+            "#,
+            trimmed_name_ar
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(false);
+
+        if name_ar_exists {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Arabic category name already exists".to_string(),
+            ));
+        }
+
         if let Some(pid) = self.parent_id {
-            // الأب المُختار يجب أن يكون موجوداً وأن يكون فئة جذعية (parent_id = NULL)
             let parent_is_valid = sqlx::query_scalar!(
                 r#"
                 SELECT EXISTS(
@@ -273,7 +348,7 @@ impl CreateCategoryApiDto {
             .unwrap_or(false);
 
             if !parent_is_valid {
-                let msg = "Parent ID does not exist, or is not a top-level category (cannot select a sub-category as parent)".to_string();
+                let msg = "Parent ID does not exist, or is not a top-level category".to_string();
                 return Err((StatusCode::BAD_REQUEST, msg));
             }
         }
@@ -286,40 +361,21 @@ impl CreateCategoryApiDto {
 // SECTION 2: Web (HTML Forms + Askama Templates)
 // ============================================================================
 
-/// يحوّل حقل نموذج HTML فارغ (سلسلة نصية فارغة) إلى None بدل محاولة تحويله لرقم
-/// مفيد لأن حقول <select> أو <input> في نماذج HTML ترسل "" وليس null عند عدم الاختيار
-pub fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let opt = Option::<String>::deserialize(deserializer)?;
-    match opt {
-        None => Ok(None),
-        Some(s) if s.trim().is_empty() => Ok(None),
-        Some(s) => match s.parse::<i32>() {
-            Ok(v) => Ok(Some(v)),
-            Err(e) => Err(serde::de::Error::custom(e)),
-        },
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 2.1 Create Category (HTML Form)
-// ---------------------------------------------------------------------------
-
-/// نموذج إنشاء الفئة عبر واجهة الويب (HTML Forms)
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CreateCategoryForm {
     pub name: String,
     pub name_ar: String,
-    #[serde(deserialize_with = "empty_string_as_none", default)]
+
+    // Uses i32 helper
+    #[serde(default, deserialize_with = "empty_number_as_none")]
     pub parent_id: Option<i32>,
+
+    // Uses String helper
+    #[serde(default, deserialize_with = "empty_string_as_none")]
     pub notes: Option<String>,
 }
 
 impl CreateCategoryForm {
-    /// يفوّض التحقق لـ MergedCategoryFormData (current_category_id = None لأن
-    /// الفئة الجديدة لسه مالهاش id، فمفيش داعي للتحقق من "أب لنفسه")
     pub fn validate(&self, existing_categories: &[CategoryResponseDto]) -> Result<(), String> {
         let merged = MergedCategoryFormData {
             name: &self.name,
@@ -330,23 +386,19 @@ impl CreateCategoryForm {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2.2 Update Category (HTML Form)
-// ---------------------------------------------------------------------------
-
-/// نموذج تحديث الفئة عبر واجهة الويب (HTML Forms)
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct UpdateCategoryForm {
     pub name: String,
     pub name_ar: String,
-    #[serde(deserialize_with = "empty_string_as_none", default)]
+
+    #[serde(default, deserialize_with = "empty_number_as_none")]
     pub parent_id: Option<i32>,
+
+    #[serde(default, deserialize_with = "empty_string_as_none")]
     pub notes: Option<String>,
 }
 
 impl UpdateCategoryForm {
-    /// يفوّض التحقق لـ MergedCategoryFormData (current_category_id = Some(id)
-    /// عشان نمنع الفئة من إن تبقى أب لنفسها)
     pub fn validate(
         &self,
         current_category_id: i32,
@@ -361,13 +413,6 @@ impl UpdateCategoryForm {
     }
 }
 
-/// نسخة "مدموجة" من بيانات الفئة القادمة من فورم HTML (سواء إنشاء أو تعديل).
-/// نفس فكرة MergedBrandFormData بالظبط: طبقة واحدة تجمع منطق التحقق المشترك
-/// بدل ما يتكرر حرفيًا في CreateCategoryForm و UpdateCategoryForm كل على حدة.
-///
-/// هنا الفايدة حقيقية أكتر من حالة البراند: منطق التحقق من parent_id (وجوده،
-/// كونه فئة جذعية، ومنع الفئة من أن تكون أب لنفسها) كان متكرر بالحرف الواحد
-/// في الملفين - دلوقتي مكتوب مرة واحدة بس.
 pub struct MergedCategoryFormData<'a> {
     pub name: &'a str,
     pub name_ar: &'a str,
@@ -375,9 +420,6 @@ pub struct MergedCategoryFormData<'a> {
 }
 
 impl<'a> MergedCategoryFormData<'a> {
-    /// current_category_id:
-    /// - None    -> حالة الإنشاء (فئة جديدة، مفيش id لسه)
-    /// - Some(id) -> حالة التعديل (نمنع الفئة من اختيار نفسها كأب)
     pub fn validate(
         &self,
         current_category_id: Option<i32>,
@@ -399,8 +441,26 @@ impl<'a> MergedCategoryFormData<'a> {
             return Err("اسم الفئة بالعربية يجب ألا يتجاوز 50 حرفاً".to_string());
         }
 
+        // 🎯 1. فحص التكرار للاسم بالإنجليزية (In-Memory Case-insensitive + Trim)
+        let name_exists = existing_categories.iter().any(|cat| {
+            Some(cat.id) != current_category_id
+                && cat.name.trim().eq_ignore_ascii_case(trimmed_name)
+        });
+        if name_exists {
+            return Err("اسم الفئة بالإنجليزية موجود بالفعل".to_string());
+        }
+
+        // 🎯 2. فحص التكرار للاسم بالعربية
+        let name_ar_exists = existing_categories.iter().any(|cat| {
+            Some(cat.id) != current_category_id
+                && cat.name_ar.trim() == trimmed_name_ar
+        });
+        if name_ar_exists {
+            return Err("اسم الفئة بالعربية موجود بالفعل".to_string());
+        }
+
+        // 🎯 3. التحقق من صلاحية الفئة الأب + حظر الأبناء
         if let Some(pid) = self.parent_id {
-            // لا يمكن للفئة أن تكون أباً لنفسها (بيسري بس وقت التعديل)
             if Some(pid) == current_category_id {
                 return Err("لا يمكن تعيين الفئة كأب لنفسها".to_string());
             }
@@ -417,20 +477,28 @@ impl<'a> MergedCategoryFormData<'a> {
                 }
                 Some(_) => {}
             }
+
+            // إذا كان هذا التعديل لفئة حالية وكانت فئة جذعية، نتأكد أنها لا تملك أبناء قبل تحويلها لفئة فرعية
+            if let Some(cid) = current_category_id {
+                let current_cat = existing_categories.iter().find(|c| c.id == cid);
+                if let Some(cat) = current_cat {
+                    if cat.parent_id.is_none() {
+                        let has_children = existing_categories.iter().any(|c| c.parent_id == Some(cid));
+                        if has_children {
+                            return Err(
+                                "لا يمكن تحويل هذه الفئة إلى فئة فرعية لأن لديها فئات فرعية تابعة لها"
+                                    .to_string(),
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2.3 View Model: صف جاهز للعرض في جدول الفئات
-// ---------------------------------------------------------------------------
-
-/// صف معروض في جدول الفئات - نفس بيانات CategoryResponseDto، لكن مع اسم
-/// الفئة الأب جاهز كنص (بدل ما التمبلت يدوّر عليه بنفسه بين كل الفئات).
-/// الحساب بيتم في Rust مرة واحدة وقت التحضير، عشان التمبلت يفضل "غبي" وبسيط
-/// ومحتاجش فلاتر مخصصة معقدة بتدور جوه قايمة.
 #[derive(Debug, Clone)]
 pub struct CategoryRow {
     pub id: i32,
@@ -438,15 +506,10 @@ pub struct CategoryRow {
     pub name_ar: String,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
-    /// None  -> فئة جذعية (هتتعرض كـ badge "فئة رئيسية")
-    /// Some(name) -> اسم الفئة الأب
     pub parent_name: Option<String>,
 }
 
 impl CategoryRow {
-    /// يحوّل قائمة مسطّحة من CategoryResponseDto إلى صفوف جاهزة للعرض.
-    /// بيحل اسم كل أب مرة واحدة عبر HashMap (O(n) بدل ما ندوّر جوه القايمة
-    /// لكل فئة على حدة وناخد O(n^2))
     pub fn build_rows(categories: &[CategoryResponseDto]) -> Vec<CategoryRow> {
         let id_to_name: HashMap<i32, &str> =
             categories.iter().map(|c| (c.id, c.name.as_str())).collect();
@@ -467,26 +530,15 @@ impl CategoryRow {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2.4 Askama Template
-// ---------------------------------------------------------------------------
-
-/// قالب الـ Askama لعرض وإدارة الفئات في صفحات الويب
 #[derive(Template, WebTemplate)]
-#[template(path = "categories-fetch.html")]
+#[template(path = "categories.html")]
 pub struct CategoryTemplate {
-    /// صفوف الجدول (جاهزة للعرض، فيها اسم الأب محسوب مسبقًا)
     pub categories: Vec<CategoryRow>,
-    /// الفئات الجذعية بس - تُستخدم لملء قائمة اختيار "الفئة الرئيسية" في الفورم
     pub root_categories: Vec<CategoryResponseDto>,
     pub error_message: Option<String>,
     pub success_message: Option<String>,
     pub edit_category: Option<CategoryResponseDto>,
 }
-
-// ---------------------------------------------------------------------------
-// 2.5 Custom Askama filters (نفس فكرة filters بتاعة البراند، للـ avatar الملوّن)
-// ---------------------------------------------------------------------------
 
 pub mod filters {
     use askama::Values;
@@ -508,7 +560,3 @@ pub mod filters {
         Ok(PALETTE[sum as usize % PALETTE.len()].to_string())
     }
 }
-
-
-
-
