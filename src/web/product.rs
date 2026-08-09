@@ -154,7 +154,7 @@ pub async fn create_product_web(
 
 pub async fn edit_product_page(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> ProductsTemplate {
     let products = fetch_all_products(&state).await;
     let categories = fetch_all_categories(&state).await;
@@ -173,7 +173,7 @@ pub async fn edit_product_page(
 
 pub async fn update_product_web(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Form(form): Form<UpdateProductForm>,
 ) -> axum::response::Response {
     let products = fetch_all_products(&state).await;
@@ -261,7 +261,7 @@ pub async fn update_product_web(
 
 pub async fn delete_product_web(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> axum::response::Response {
     let result = sqlx::query("DELETE FROM products WHERE id = $1")
         .bind(id)

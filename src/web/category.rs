@@ -53,7 +53,7 @@ async fn fetch_category_by_id(state: &AppState, id: i32) -> Option<CategoryRespo
 /// exclude_id: نستبعد بيه الفئة الحالية وقت التعديل (فئة ميقدرش تبقى أب لنفسها)
 fn build_root_categories(
     categories: &[CategoryResponseDto],
-    exclude_id: Option<i32>,
+    exclude_id: Option<i64>,
 ) -> Vec<CategoryResponseDto> {
     categories
         .iter()
@@ -148,7 +148,7 @@ pub async fn create_category_web(
 
 pub async fn edit_category_page(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> CategoryTemplate {
     let all = fetch_all_categories(&state).await;
     let edit_category = all.iter().find(|c| c.id == id).cloned();
@@ -166,7 +166,7 @@ pub async fn edit_category_page(
 
 pub async fn update_category_web(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Form(form): Form<UpdateCategoryForm>,
 ) -> axum::response::Response {
     let all = fetch_all_categories(&state).await;
@@ -234,7 +234,7 @@ pub async fn update_category_web(
 
 pub async fn delete_category_web(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> axum::response::Response {
     let result = sqlx::query("DELETE FROM categories WHERE id = $1")
         .bind(id)

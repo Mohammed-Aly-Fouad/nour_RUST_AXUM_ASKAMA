@@ -25,10 +25,10 @@ where
 /// Shared DTO for displaying product data (used in both the JSON API and Askama templates)
 #[derive(Debug, Serialize, FromRow, Clone)]
 pub struct ProductResponseDto {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub name_ar: String,
-    pub category_id: i32,
+    pub category_id: i64,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -43,7 +43,7 @@ pub struct ProductResponseDto {
 pub struct CreateProductDto {
     pub name: String,
     pub name_ar: String,
-    pub category_id: i32,
+    pub category_id: i64,
     #[serde(default, deserialize_with = "empty_string_as_none")]
     pub notes: Option<String>,
 }
@@ -104,7 +104,7 @@ impl CreateProductDto {
 pub struct UpdateProductDto {
     pub name: Option<String>,
     pub name_ar: Option<String>,
-    pub category_id: Option<i32>,
+    pub category_id: Option<i64>,
     /// Nested Option allows passing `null` in JSON to explicitly clear the notes field in the DB
     pub notes: Option<Option<String>>,
 }
@@ -185,7 +185,7 @@ impl UpdateProductDto {
 pub struct CreateProductForm {
     pub name: String,
     pub name_ar: String,
-    pub category_id: i32,
+    pub category_id: i64,
     #[serde(default, deserialize_with = "empty_string_as_none")]
     pub notes: Option<String>,
 }
@@ -236,7 +236,7 @@ impl CreateProductForm {
 pub struct UpdateProductForm {
     pub name: String,
     pub name_ar: String,
-    pub category_id: i32,
+    pub category_id: i64,
     #[serde(default, deserialize_with = "empty_string_as_none")]
     pub notes: Option<String>,
 }
@@ -244,7 +244,7 @@ pub struct UpdateProductForm {
 pub struct MergedProductFormData<'a> {
     pub name: &'a str,
     pub name_ar: &'a str,
-    pub category_id: i32,
+    pub category_id: i64,
     pub notes: Option<&'a str>,
 }
 

@@ -1,38 +1,50 @@
 -- ========================================================
--- 3. Products Table
+-- 3. Table: public.products
 -- ========================================================
-CREATE TABLE IF NOT EXISTS public.products (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    name_ar VARCHAR(255) NOT NULL,
-    category_id INT NOT NULL,
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    -- Explicit Foreign Key Constraint
-    CONSTRAINT fk_products_category
-        FOREIGN KEY (category_id) 
-        REFERENCES public.categories (id) 
-        ON DELETE RESTRICT 
+-- DROP TABLE IF EXISTS public.products CASCADE;
+
+CREATE TABLE IF NOT EXISTS public.products
+(
+    id bigint NOT NULL GENERATED ALWAYS AS IDENTITY,
+    category_id bigint NOT NULL,
+    name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    name_ar character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    notes text COLLATE pg_catalog."default",
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+
+    CONSTRAINT products_pkey PRIMARY KEY (id),
+    CONSTRAINT fk_products_category FOREIGN KEY (category_id)
+        REFERENCES public.categories (id) MATCH SIMPLE
         ON UPDATE CASCADE
-);
+        ON DELETE RESTRICT
+)
+TABLESPACE pg_default;
 
--- Foreign key lookup index
-CREATE INDEX IF NOT EXISTS idx_products_category_id 
-    ON public.products (category_id);
+ALTER TABLE IF EXISTS public.products OWNER to mohammed;
 
--- Case-Insensitive Unique Indexes
--- Enforces uniqueness while treating 'Product A', 'product a', and 'PRODUCT A' as identical
-CREATE UNIQUE INDEX IF NOT EXISTS idx_products_unique_name_lower 
-    ON public.products (LOWER(name));
+-- Indexes for products
+CREATE INDEX IF NOT EXISTS idx_products_category_id
+    ON public.products USING btree
+    (category_id ASC NULLS LAST)
+    WITH (fillfactor=100, deduplicate_items=True)
+    TABLESPACE pg_default;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_products_unique_name_ar_lower 
-    ON public.products (LOWER(name_ar));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_unique_name_lower
+    ON public.products USING btree
+    (lower(name::text) COLLATE pg_catalog."default" ASC NULLS LAST)
+    WITH (fillfactor=100, deduplicate_items=True)
+    TABLESPACE pg_default;
 
--- Updated-at trigger
-DROP TRIGGER IF EXISTS update_products_modtime ON public.products;
-CREATE TRIGGER update_products_modtime
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_unique_name_ar_lower
+    ON public.products USING btree
+    (lower(name_ar::text) COLLATE pg_catalog."default" ASC NULLS LAST)
+    WITH (fillfactor=100, deduplicate_items=True)
+    TABLESPACE pg_default;
+
+-- Trigger for products
+CREATE OR REPLACE TRIGGER update_products_modtime
     BEFORE UPDATE ON public.products
     FOR EACH ROW
     EXECUTE FUNCTION public.update_modified_column();

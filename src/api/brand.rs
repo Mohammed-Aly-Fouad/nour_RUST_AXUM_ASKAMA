@@ -65,7 +65,7 @@ pub async fn list_brands(State(state): State<AppState>) -> impl IntoResponse {
 /// Retrieves a single brand by its ID.
 pub async fn get_brand(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> impl IntoResponse {
     let brand = sqlx::query_as!(
         BrandResponseDto,
@@ -168,7 +168,7 @@ pub async fn create_brand(
 /// any field left out (`None`) keeps its existing value.
 pub async fn update_brand(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Json(payload): Json<UpdateBrandDto>,
 ) -> impl IntoResponse {
     // 1. Fetch the existing brand to confirm it exists
@@ -283,7 +283,7 @@ pub async fn update_brand(
 /// (e.g. products) pointing to it via a foreign key.
 pub async fn delete_brand(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> impl IntoResponse {
     // Attempt the delete directly; RETURNING tells us whether a row actually existed
     let result = sqlx::query!(

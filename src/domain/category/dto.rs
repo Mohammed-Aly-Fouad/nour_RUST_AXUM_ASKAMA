@@ -6,24 +6,33 @@ use serde::Deserializer;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use std::collections::HashMap;
+use std::fmt::Display;
+use std::str::FromStr;
 
 // ============================================================================
 // HELPERS FOR DESERIALIZATION
 // ============================================================================
 
 /// يحوّل حقل رقمي فارغ (سلسلة نصية فارغة "") من HTML Form إلى None
-pub fn empty_number_as_none<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+pub fn empty_number_as_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,
+    T: FromStr + Deserialize<'de>,
+    <T as FromStr>::Err: Display,
 {
-    let opt = Option::<String>::deserialize(deserializer)?;
-    match opt {
-        None => Ok(None),
-        Some(s) if s.trim().is_empty() => Ok(None),
-        Some(s) => match s.parse::<i32>() {
-            Ok(v) => Ok(Some(v)),
-            Err(e) => Err(serde::de::Error::custom(e)),
-        },
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OptionNum<T> {
+        Num(T),
+        Str(String),
+        None,
+    }
+
+    match OptionNum::<T>::deserialize(deserializer)? {
+        OptionNum::Num(n) => Ok(Some(n)),
+        OptionNum::Str(s) if s.trim().is_empty() => Ok(None),
+        OptionNum::Str(s) => s.trim().parse::<T>().map(Some).map_err(serde::de::Error::custom),
+        OptionNum::None => Ok(None),
     }
 }
 
@@ -42,10 +51,10 @@ where
 
 #[derive(Deserialize, Serialize, FromRow, Clone)]
 pub struct CategoryResponseDto {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub name_ar: String,
-    pub parent_id: Option<i32>,
+    pub parent_id: Option<i64>,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -53,7 +62,7 @@ pub struct CategoryResponseDto {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct CategoryTreeDto {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub name_ar: String,
     pub notes: Option<String>,
@@ -76,7 +85,7 @@ impl CategoryTreeDto {
     }
 
     pub fn build_tree(flat_categories: Vec<CategoryResponseDto>) -> Vec<CategoryTreeDto> {
-        let mut children_map: HashMap<i32, Vec<&CategoryResponseDto>> = HashMap::new();
+        let mut children_map: HashMap<i64, Vec<&CategoryResponseDto>> = HashMap::new();
         let mut roots: Vec<&CategoryResponseDto> = Vec::new();
 
         for cat in &flat_categories {
@@ -94,7 +103,7 @@ impl CategoryTreeDto {
 
     fn build_node(
         cat: &CategoryResponseDto,
-        children_map: &HashMap<i32, Vec<&CategoryResponseDto>>,
+        children_map: &HashMap<i64, Vec<&CategoryResponseDto>>,
     ) -> CategoryTreeDto {
         let mut node = Self::from_flat(cat);
 
@@ -113,21 +122,21 @@ impl CategoryTreeDto {
 pub struct UpdateCategoryApiDto {
     pub name: Option<String>,
     pub name_ar: Option<String>,
-    pub parent_id: Option<i32>,
+    pub parent_id: Option<i64>,
     pub notes: Option<String>,
 }
 
 pub struct MergedCategoryData<'a> {
     pub name: &'a str,
     pub name_ar: &'a str,
-    pub parent_id: Option<i32>,
+    pub parent_id: Option<i64>,
 }
 
 impl<'a> MergedCategoryData<'a> {
     pub async fn validate(
         &self,
-        current_category_id: i32,
-        old_parent_id: Option<i32>,
+        current_category_id: i64,
+        old_parent_id: Option<i64>,
         pool: &sqlx::PgPool,
     ) -> Result<(), (StatusCode, String)> {
         let trimmed_name = self.name.trim();
@@ -257,7 +266,7 @@ impl<'a> MergedCategoryData<'a> {
 pub struct CreateCategoryApiDto {
     pub name: String,
     pub name_ar: String,
-    pub parent_id: Option<i32>,
+    pub parent_id: Option<i64>,
     pub notes: Option<String>,
 }
 
@@ -368,7 +377,7 @@ pub struct CreateCategoryForm {
 
     // Uses i32 helper
     #[serde(default, deserialize_with = "empty_number_as_none")]
-    pub parent_id: Option<i32>,
+    pub parent_id: Option<i64>,
 
     // Uses String helper
     #[serde(default, deserialize_with = "empty_string_as_none")]
@@ -392,7 +401,7 @@ pub struct UpdateCategoryForm {
     pub name_ar: String,
 
     #[serde(default, deserialize_with = "empty_number_as_none")]
-    pub parent_id: Option<i32>,
+    pub parent_id: Option<i64>,
 
     #[serde(default, deserialize_with = "empty_string_as_none")]
     pub notes: Option<String>,
@@ -401,7 +410,7 @@ pub struct UpdateCategoryForm {
 impl UpdateCategoryForm {
     pub fn validate(
         &self,
-        current_category_id: i32,
+        current_category_id: i64,
         existing_categories: &[CategoryResponseDto],
     ) -> Result<(), String> {
         let merged = MergedCategoryFormData {
@@ -416,13 +425,13 @@ impl UpdateCategoryForm {
 pub struct MergedCategoryFormData<'a> {
     pub name: &'a str,
     pub name_ar: &'a str,
-    pub parent_id: Option<i32>,
+    pub parent_id: Option<i64>,
 }
 
 impl<'a> MergedCategoryFormData<'a> {
     pub fn validate(
         &self,
-        current_category_id: Option<i32>,
+        current_category_id: Option<i64>,
         existing_categories: &[CategoryResponseDto],
     ) -> Result<(), String> {
         let trimmed_name = self.name.trim();
@@ -501,7 +510,7 @@ impl<'a> MergedCategoryFormData<'a> {
 
 #[derive(Debug, Clone)]
 pub struct CategoryRow {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub name_ar: String,
     pub notes: Option<String>,
@@ -511,7 +520,7 @@ pub struct CategoryRow {
 
 impl CategoryRow {
     pub fn build_rows(categories: &[CategoryResponseDto]) -> Vec<CategoryRow> {
-        let id_to_name: HashMap<i32, &str> =
+        let id_to_name: HashMap<i64, &str> =
             categories.iter().map(|c| (c.id, c.name.as_str())).collect();
 
         categories

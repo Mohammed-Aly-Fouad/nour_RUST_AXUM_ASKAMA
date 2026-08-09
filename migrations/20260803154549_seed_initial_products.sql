@@ -1,63 +1,87 @@
--- ========================================================
--- Insert Products Seed Data (Starting from ID 1)
--- ========================================================
-INSERT INTO public.products (id, category_id, name, name_ar) VALUES 
-(1, 212, 'Glue stick', 'جلو ستيك'),
-(2, 212, 'Sellotape', 'شريط لاصق سلوتيب'),
-(3, 603, 'Colored Pencil', 'ألوان خشب'),
-(4, 501, 'Calculator', 'ألة حاسبة'),
-(5, 501, 'Dry Cell Battery', 'بطارية جافة'),
-(6, 203, 'Correction Pen', 'قلم كوريكتور'),
-(7, 203, 'Eraser', 'استيكة'),
-(8, 401, 'Pocket Display Book', 'هولدر جيوب متعددة'),
-(9, 401, 'U-Shape Sheet Protector', 'حافظة حرف يو'),
-(10, 401, 'L-Shape Sheet Protector', 'حافظة حرف إل'),
-(11, 401, 'Envelope', 'ظرف'),
-(12, 401, 'Plastic Envelope with Button', 'حافظة كبسولة'),
-(13, 401, 'Zipper Document Wallet', 'حافظة سوستة'),
-(14, 401, 'Loose-Leaf Ring Binder', 'كلاسير حلقات'),
-(15, 401, 'Slide Binder', 'دوسيه مسطرة'),
-(16, 602, 'Stencil Ruler', 'مسطرة أشكال'),
-(17, 802, 'Wrapping Ribbon', 'شريط لف الهدايا'),
-(18, 306, 'Legal Contract', 'عقود'),
-(19, 306, 'Receipt', 'إيصالات'),
-(20, 306, 'registration folder', 'ملف تقديم'),
-(21, 205, 'Whiteboard Marker', 'قلم سبورة'),
-(22, 205, 'Permanent Marker', 'قلم ماركر دائم'),
-(23, 205, 'Highlighter', 'قلم هاي لايتر'),
-(24, 801, 'Modeling Clay', 'صلصال'),
-(25, 101, 'Pocket Notebook', 'نوت بوك صغيرة'),
-(26, 101, 'Exercise Book', 'كراسة'),
-(27, 101, 'Notebook', 'كشكول'),
-(28, 101, 'Ruled Paper', 'ورق مسطر'),
-(29, 802, 'Balloon', 'بالون'),
-(30, 701, 'Pencil Case', 'مقلمة'),
-(31, 201, 'Pencil Sharpener', 'براية'),
-(32, 201, 'Graphite Pencil', 'قلم رصاص'),
-(33, 201, 'Mechanical Pencil', 'قلم رصاص سنون'),
-(34, 206, 'Pen', 'قلم جاف'),
-(35, 304, 'Invoice Book', 'دفتر فواتير'),
-(36, 304, 'Price Labels', 'ملصقات الأسعار'),
-(37, 304, 'Thermal Paper Roll', 'بكر حراري'),
-(38, 401, 'Report Cover', 'دوسيه تقارير'),
-(39, 305, 'Rubber Bands', 'أساتك'),
-(40, 603, 'Sketchbook', 'كراس رسم'),
-(41, 302, 'Stamp Pad Refill Ink', 'حبر ختامة'),
-(42, 305, 'Bulldog Clip', 'مشبك ورق'),
-(43, 305, 'Clipboard', 'بلانشيطة'),
-(44, 305, 'Sticky Note', 'سيتكي نوت'),
-(45, 501, 'USB Flash Drive', 'فلاش ميموري'),
-(46, 212, 'Glue Gun Stick', 'غيار مسدس شمع'),
-(47, 602, 'Protractor', 'منقلة'),
-(48, 602, 'Ruler', 'مسطرة'),
-(49, 602, 'Compass', 'برجل'),
-(50, 306, 'Lease agreement', 'عقد إيجار'),
-(51, 304, 'Custom Invoice Book', 'دفتر فواتير مخصص')
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.products (category_id, name, name_ar) VALUES 
+-- 212: Adhesives & Glues
+((SELECT id FROM public.categories WHERE name = 'Adhesives & Glues'), 'Glue stick', 'جلو ستيك'),
+((SELECT id FROM public.categories WHERE name = 'Adhesives & Glues'), 'Sellotape', 'شريط لاصق سلوتيب'),
+((SELECT id FROM public.categories WHERE name = 'Adhesives & Glues'), 'Glue Gun Stick', 'غيار مسدس شمع'),
 
--- Synchronize sequence after manual ID inserts
-SELECT setval(
-    pg_get_serial_sequence('public.products', 'id'), 
-    COALESCE(MAX(id), 1),
-    (MAX(id) IS NOT NULL)
-) FROM public.products;
+-- 603: Art Supplies, Sketchbooks & Colors
+((SELECT id FROM public.categories WHERE name = 'Art Supplies, Sketchbooks & Colors'), 'Colored Pencil', 'ألوان خشب'),
+((SELECT id FROM public.categories WHERE name = 'Art Supplies, Sketchbooks & Colors'), 'Sketchbook', 'كراس رسم'),
+
+-- 501: Calculators, Storage & Tech Accessories
+((SELECT id FROM public.categories WHERE name = 'Calculators, Storage & Tech Accessories'), 'Calculator', 'ألة حاسبة'),
+((SELECT id FROM public.categories WHERE name = 'Calculators, Storage & Tech Accessories'), 'Dry Cell Battery', 'بطارية جافة'),
+((SELECT id FROM public.categories WHERE name = 'Calculators, Storage & Tech Accessories'), 'USB Flash Drive', 'فلاش ميموري'),
+
+-- 203: Erasers & Correction
+((SELECT id FROM public.categories WHERE name = 'Erasers & Correction'), 'Correction Pen', 'قلم كوريكتور'),
+((SELECT id FROM public.categories WHERE name = 'Erasers & Correction'), 'Eraser', 'استيكة'),
+
+-- 401: Files, Folders & Envelopes
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'Pocket Display Book', 'هولدر جيوب متعددة'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'U-Shape Sheet Protector', 'حافظة حرف يو'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'L-Shape Sheet Protector', 'حافظة حرف إل'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'Envelope', 'ظرف'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'Plastic Envelope with Button', 'حافظة كبسولة'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'Zipper Document Wallet', 'حافظة سوستة'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'Loose-Leaf Ring Binder', 'كلاسير حلقات'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'Slide Binder', 'دوسيه مسطرة'),
+((SELECT id FROM public.categories WHERE name = 'Files, Folders & Envelopes'), 'Report Cover', 'دوسيه تقارير'),
+
+-- 602: Geometry & Measuring Tools
+((SELECT id FROM public.categories WHERE name = 'Geometry & Measuring Tools'), 'Stencil Ruler', 'مسطرة أشكال'),
+((SELECT id FROM public.categories WHERE name = 'Geometry & Measuring Tools'), 'Protractor', 'منقلة'),
+((SELECT id FROM public.categories WHERE name = 'Geometry & Measuring Tools'), 'Ruler', 'مسطرة'),
+((SELECT id FROM public.categories WHERE name = 'Geometry & Measuring Tools'), 'Compass', 'برجل'),
+
+-- 802: Party & Birthday Supplies
+((SELECT id FROM public.categories WHERE name = 'Party & Birthday Supplies'), 'Wrapping Ribbon', 'شريط لف الهدايا'),
+((SELECT id FROM public.categories WHERE name = 'Party & Birthday Supplies'), 'Balloon', 'بالون'),
+
+-- 306: Legal Contracts & Ready Forms
+((SELECT id FROM public.categories WHERE name = 'Legal Contracts & Ready Forms'), 'Legal Contract', 'عقود'),
+((SELECT id FROM public.categories WHERE name = 'Legal Contracts & Ready Forms'), 'Receipt', 'إيصالات'),
+((SELECT id FROM public.categories WHERE name = 'Legal Contracts & Ready Forms'), 'registration folder', 'ملف تقديم'),
+((SELECT id FROM public.categories WHERE name = 'Legal Contracts & Ready Forms'), 'Lease agreement', 'عقد إيجار'),
+
+-- 205: Markers & Highlighters
+((SELECT id FROM public.categories WHERE name = 'Markers & Highlighters'), 'Whiteboard Marker', 'قلم سبورة'),
+((SELECT id FROM public.categories WHERE name = 'Markers & Highlighters'), 'Permanent Marker', 'قلم ماركر دائم'),
+((SELECT id FROM public.categories WHERE name = 'Markers & Highlighters'), 'Highlighter', 'قلم هاي لايتر'),
+
+-- 801: Modeling Dough & Crafts
+((SELECT id FROM public.categories WHERE name = 'Modeling Dough & Crafts'), 'Modeling Clay', 'صلصال'),
+
+-- 101: Notebooks, Notepads & Journals
+((SELECT id FROM public.categories WHERE name = 'Notebooks, Notepads & Journals'), 'Pocket Notebook', 'نوت بوك صغيرة'),
+((SELECT id FROM public.categories WHERE name = 'Notebooks, Notepads & Journals'), 'Exercise Book', 'كراسة'),
+((SELECT id FROM public.categories WHERE name = 'Notebooks, Notepads & Journals'), 'Notebook', 'كشكول'),
+((SELECT id FROM public.categories WHERE name = 'Notebooks, Notepads & Journals'), 'Ruled Paper', 'ورق مسطر'),
+
+-- 701: Pencil Cases & School Accessories
+((SELECT id FROM public.categories WHERE name = 'Pencil Cases & School Accessories'), 'Pencil Case', 'مقلمة'),
+
+-- 201: Pencils & Lead Refills
+((SELECT id FROM public.categories WHERE name = 'Pencils & Lead Refills'), 'Pencil Sharpener', 'براية'),
+((SELECT id FROM public.categories WHERE name = 'Pencils & Lead Refills'), 'Graphite Pencil', 'قلم رصاص'),
+((SELECT id FROM public.categories WHERE name = 'Pencils & Lead Refills'), 'Mechanical Pencil', 'قلم رصاص سنون'),
+
+-- 206: Pens & Refills
+((SELECT id FROM public.categories WHERE name = 'Pens & Refills'), 'Pen', 'قلم جاف'),
+
+-- 304: Pricing, Invoicing & Thermal Rolls
+((SELECT id FROM public.categories WHERE name = 'Pricing, Invoicing & Thermal Rolls'), 'Invoice Book', 'دفتر فواتير'),
+((SELECT id FROM public.categories WHERE name = 'Pricing, Invoicing & Thermal Rolls'), 'Price Labels', 'ملصقات الأسعار'),
+((SELECT id FROM public.categories WHERE name = 'Pricing, Invoicing & Thermal Rolls'), 'Thermal Paper Roll', 'بكر حراري'),
+((SELECT id FROM public.categories WHERE name = 'Pricing, Invoicing & Thermal Rolls'), 'Custom Invoice Book', 'دفتر فواتير مخصص'),
+
+-- 305: Staplers, Clips, Rubber Bands & Desk Accessories
+((SELECT id FROM public.categories WHERE name = 'Staplers, Clips, Rubber Bands & Desk Accessories'), 'Rubber Bands', 'أساتك'),
+((SELECT id FROM public.categories WHERE name = 'Staplers, Clips, Rubber Bands & Desk Accessories'), 'Bulldog Clip', 'مشبك ورق'),
+((SELECT id FROM public.categories WHERE name = 'Staplers, Clips, Rubber Bands & Desk Accessories'), 'Clipboard', 'بلانشيطة'),
+((SELECT id FROM public.categories WHERE name = 'Staplers, Clips, Rubber Bands & Desk Accessories'), 'Sticky Note', 'سيتكي نوت'),
+
+-- 302: Stamps & Inks
+((SELECT id FROM public.categories WHERE name = 'Stamps & Inks'), 'Stamp Pad Refill Ink', 'حبر ختامة')
+
+ON CONFLICT ((lower(name::text))) DO NOTHING;

@@ -60,7 +60,7 @@ pub async fn list_products(State(state): State<AppState>) -> impl IntoResponse {
 /// Retrieves a single product by its ID.
 pub async fn get_product(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> impl IntoResponse {
     let product = sqlx::query_as!(
         ProductResponseDto,
@@ -172,7 +172,7 @@ pub async fn create_product(
 /// 
 pub async fn update_product(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Json(payload): Json<UpdateProductDto>,
 ) -> impl IntoResponse {
     // 1. Validate payload format (in-memory)
@@ -306,7 +306,7 @@ pub async fn update_product(
 /// Deletes a product by its ID.
 pub async fn delete_product(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> impl IntoResponse {
     // 1. Execute DELETE query and return basic info of the deleted record
     let deleted_product = sqlx::query_as!(

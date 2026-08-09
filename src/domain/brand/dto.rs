@@ -12,7 +12,7 @@ use sqlx::FromRow;
 /// Shared DTO for displaying brand data (used in both the JSON API and Askama templates)
 #[derive(Debug, Serialize, FromRow, Clone)]
 pub struct BrandResponseDto {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub name_ar: String,
     pub notes: Option<String>,

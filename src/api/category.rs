@@ -73,7 +73,7 @@ pub async fn get_category(
     Path(id_str): Path<String>,
 ) -> impl IntoResponse {
     // 1. Parse the ID from String to i32 (gives a clear, unified error message on failure)
-    let id = match id_str.parse::<i32>() {
+    let id = match id_str.parse::<i64>() {
         Ok(parsed_id) => parsed_id,
         Err(_) => {
             let response = ApiResponse::<CategoryResponseDto>::error(
@@ -187,7 +187,7 @@ pub async fn create_category(
 /// any field left out (`None`) keeps its existing value.
 pub async fn update_category(
     State(state): State<AppState>,
-    Path(category_id): Path<i32>,
+    Path(category_id): Path<i64>,
     Json(payload): Json<UpdateCategoryApiDto>,
 ) -> impl IntoResponse {
     // 1. Fetch the existing category to confirm it exists
@@ -311,7 +311,7 @@ pub async fn update_category(
 /// (or other related records) pointing to it via a foreign key.
 pub async fn delete_category(
     State(state): State<AppState>,
-    Path(category_id): Path<i32>,
+    Path(category_id): Path<i64>,
 ) -> impl IntoResponse {
     // Attempt the delete directly; RETURNING tells us whether a row actually existed
     let result = sqlx::query!(

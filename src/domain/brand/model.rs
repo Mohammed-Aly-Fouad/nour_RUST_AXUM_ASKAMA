@@ -4,7 +4,7 @@ use sqlx::FromRow;
 
 #[derive(Serialize, Deserialize, FromRow, Debug, Clone)]
 pub struct Brand {
-    pub id: i32,
+    pub id: i64,
     pub name: String,
     pub name_ar: String,
     pub notes: Option<String>,

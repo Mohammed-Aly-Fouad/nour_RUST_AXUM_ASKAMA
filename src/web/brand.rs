@@ -61,7 +61,7 @@ async fn fetch_all_brands(state: &AppState) -> Vec<BrandResponseDto> {
 }
 
 /// يجلب براند واحد بالـ ID (يُستخدم لتحميل بيانات فورم التعديل مسبقًا).
-async fn fetch_brand_by_id(state: &AppState, id: i32) -> Option<BrandResponseDto> {
+async fn fetch_brand_by_id(state: &AppState, id: i64) -> Option<BrandResponseDto> {
     sqlx::query_as!(
         BrandResponseDto,
         r#"SELECT id, name, name_ar, notes, created_at, updated_at FROM brands WHERE id = $1"#,
@@ -154,7 +154,7 @@ pub async fn create_brand_web(
 /// Renders the page with a specific brand pre-loaded in the edit form.
 pub async fn edit_brand_page(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> BrandsTemplate {
     BrandsTemplate {
         brands: fetch_all_brands(&state).await,
@@ -174,7 +174,7 @@ pub async fn edit_brand_page(
 /// بدل ما نكرره هنا تاني بشكل منفصل عن UpdateBrandForm::validate.
 pub async fn update_brand_web(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
     Form(form): Form<UpdateBrandForm>,
 ) -> axum::response::Response {
     // 1. تأكد إن البراند موجود أصلًا قبل أي حاجة
@@ -250,7 +250,7 @@ pub async fn update_brand_web(
 /// instead of failing quietly.
 pub async fn delete_brand_web(
     State(state): State<AppState>,
-    Path(id): Path<i32>,
+    Path(id): Path<i64>,
 ) -> axum::response::Response {
     let result = sqlx::query!(r#"DELETE FROM brands WHERE id = $1"#, id)
         .execute(&state.pool)
