@@ -5,9 +5,8 @@ mod domain;
 mod error;
 mod startup;
 mod state;
-
 use state::AppState;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{cors::{Any, CorsLayer}, services::ServeDir};
 use axum::Router;
 use std::net::SocketAddr;
 
@@ -36,6 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 let app = Router::new()
     .nest("/api", crate::api::router())
     .nest("/web", crate::web::router())
+    .nest_service("/assets", ServeDir::new("assets"))
     .layer(cors)
     .with_state(state);
     // 6. Resolve server address from environment variable or fall back to 127.0.0.1:3000

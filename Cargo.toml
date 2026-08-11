@@ -9,7 +9,7 @@ tokio = { version = "1.38", features = ["full"] }
 
 # Web Framework & HTTP
 axum = { version = "0.8", features = ["macros"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
 
 # Database & Migration
 sqlx = { version = "0.8", features = [
