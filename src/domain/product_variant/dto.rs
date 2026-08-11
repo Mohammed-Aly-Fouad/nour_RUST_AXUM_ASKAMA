@@ -9,6 +9,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
+use crate::domain::brand::dto::BrandResponseDto;
+use crate::domain::product::dto::ProductResponseDto;
+
 // ============================================================================
 // HELPERS FOR DESERIALIZATION
 // ============================================================================
@@ -733,6 +736,8 @@ impl ProductVariantRow {
 #[template(path = "product_variants.html")]
 pub struct ProductVariantTemplate {
     pub variants: Vec<ProductVariantRow>,
+    pub products: Vec<ProductResponseDto>, // <-- إضافة هذا الحقل
+    pub brands: Vec<BrandResponseDto>,     // <-- إضافة هذا الحقل
     pub error_message: Option<String>,
     pub success_message: Option<String>,
     pub edit_variant: Option<ProductVariantResponseDto>,
