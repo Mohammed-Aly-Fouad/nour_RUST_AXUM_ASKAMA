@@ -1,4 +1,3 @@
-use crate::domain::brand::model::Brand;
 use askama::Template;
 use askama_web::WebTemplate;
 use axum::http::StatusCode;
@@ -6,11 +5,15 @@ use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::FromRow;
 
+// Unused imports cleared (e.g., crate::domain::brand::model::Brand)
+
 // ============================================================================
-// SECTION 1: JSON API DTOs
+// SECTION 1: SHARED RESPONSE DTOS
 // ============================================================================
 
-/// Shared DTO for displaying brand data (used in both the JSON API and Askama templates)
+/// Shared Data Transfer Object representing a single Brand entity.
+///
+/// Used seamlessly across both standard JSON REST APIs and HTML Askama templates.
 #[derive(Debug, Serialize, FromRow, Clone)]
 pub struct BrandResponseDto {
     pub id: i64,
@@ -21,11 +24,15 @@ pub struct BrandResponseDto {
     pub updated_at: DateTime<Utc>,
 }
 
+// ============================================================================
+// SECTION 2: JSON REST API DTOS & VALIDATION
+// ============================================================================
+
 // ---------------------------------------------------------------------------
-// 1.1 Create Brand (POST)
+// 2.1 Create Brand (POST Request Body)
 // ---------------------------------------------------------------------------
 
-/// DTO الخاص بإنشاء براند جديد عبر JSON API
+/// DTO for creating a brand via JSON API (`POST /api/v1/brands`).
 #[derive(Debug, Deserialize)]
 pub struct CreateBrandDto {
     pub name: String,
@@ -34,7 +41,7 @@ pub struct CreateBrandDto {
 }
 
 impl CreateBrandDto {
-    /// يتحقق من صحة البيانات المُرسلة لإنشاء براند جديد
+    /// Validates the JSON creation payload fields.
     pub fn validate(&self) -> Result<(), (StatusCode, String)> {
         let trimmed_name = self.name.trim();
         if trimmed_name.is_empty() {
@@ -69,11 +76,11 @@ impl CreateBrandDto {
 }
 
 // ---------------------------------------------------------------------------
-// 1.2 Update Brand (PATCH - partial update)
+// 2.2 Update Brand (PATCH Partial Update)
 // ---------------------------------------------------------------------------
 
-/// DTO الخاص بتحديث البراند (PATCH - تحديث جزئي)
-/// كل الحقول اختيارية: لو الحقل None يعني المستخدم ما أرسله، فتبقى القيمة القديمة كما هي
+/// DTO for updating a brand via JSON API (`PATCH /api/v1/brands/{id}`).
+/// All fields are optional to support partial updates.
 #[derive(Debug, Deserialize)]
 pub struct UpdateBrandDto {
     pub name: Option<String>,
@@ -81,15 +88,16 @@ pub struct UpdateBrandDto {
     pub notes: Option<String>,
 }
 
-/// نسخة "مدموجة" تمثل القيم النهائية بعد دمج الجديد مع القديم
-/// نستخدمها كمدخل موحّد لدالة الـ validate بدل تمرير حقول متفرقة
+/// Represents the merged dataset after combining optional JSON updates with DB records.
+///
+/// Serves as a unified validation target for PATCH requests.
 pub struct MergedBrandData<'a> {
     pub name: &'a str,
     pub name_ar: &'a str,
 }
 
 impl<'a> MergedBrandData<'a> {
-    /// يتحقق من صحة البيانات النهائية بعد الدمج
+    /// Validates the merged payload state against domain invariants.
     pub fn validate(&self) -> Result<(), (StatusCode, String)> {
         let trimmed_name = self.name.trim();
         if trimmed_name.is_empty() {
@@ -124,27 +132,19 @@ impl<'a> MergedBrandData<'a> {
 }
 
 // ============================================================================
-// SECTION 2: Web (HTML Forms + Askama Templates)
+// SECTION 3: WEB HTML FORM DTOS & VALIDATION
 // ============================================================================
 //
-// ملاحظة تعليمية مهمة قبل ما نكمل:
-// في الـ API استخدمنا PATCH مع حقول Optional + خطوة "دمج" (MergedBrandData)
-// لأن العميل (Postman / Frontend عبر fetch) ممكن يبعت جزء من الحقول بس.
-//
-// أما في فورم HTML عادي (<form method="post">)، كل حقول الفورم بترجع مع كل
-// submit (حتى لو فاضية) — مفيش مفهوم "حقل غير موجود" بنفس المعنى. فالفورم
-// دايمًا هيعرض القيم الحالية للمستخدم قبل التعديل، وهو يرجّعها كلها تاني.
-// لذلك name و name_ar بيفضلوا إجباريين (String) مش Optional هنا.
-//
-// لكن عشان نحافظ على نفس *تركيب* الكود (خام -> دمج -> تحقق)، ضفنا
-// MergedBrandFormData بنفس فكرة MergedBrandData في القسم الأول.
+// ملاحظة هندسية:
+// على عكس API PATCH التي تقبل حقول اختيارية (Optional)، تحافط نماذج Web HTML Forms 
+// على إعادة إرسال الحقول الكاملة مع كل submit. لذلك تُعرف الحقول كـ String صريحة.
 // ============================================================================
 
 // ---------------------------------------------------------------------------
-// 2.1 Create Brand (HTML Form)
+// 3.1 Create Brand (HTML Form Payload)
 // ---------------------------------------------------------------------------
 
-/// نموذج إنشاء البراند عبر واجهة الويب (HTML Forms)
+/// HTML Form payload for creating a new brand.
 #[derive(Debug, Deserialize)]
 pub struct CreateBrandForm {
     pub name: String,
@@ -153,7 +153,7 @@ pub struct CreateBrandForm {
 }
 
 impl CreateBrandForm {
-    /// يتحقق من صحة بيانات إنشاء البراند القادمة من الفورم
+    /// Validates web form submissions returning localized user-facing error messages.
     pub fn validate(&self) -> Result<(), String> {
         let trimmed_name = self.name.trim();
         if trimmed_name.is_empty() {
@@ -176,12 +176,10 @@ impl CreateBrandForm {
 }
 
 // ---------------------------------------------------------------------------
-// 2.2 Update Brand (HTML Form)
+// 3.2 Update Brand (HTML Form Payload & Validation Pipeline)
 // ---------------------------------------------------------------------------
 
-/// نموذج تحديث البراند عبر واجهة الويب (HTML Forms)
-/// الحقول هنا إجبارية (وليست Optional) لأن الفورم بيرجّع كل حقوله دايمًا،
-/// عكس الـ JSON PATCH في قسم الـ API. راجع الملاحظة أعلى القسم للتفاصيل.
+/// HTML Form payload for updating an existing brand.
 #[derive(Debug, Deserialize)]
 pub struct UpdateBrandForm {
     pub name: String,
@@ -189,19 +187,14 @@ pub struct UpdateBrandForm {
     pub notes: Option<String>,
 }
 
-/// نسخة "مدموجة" من بيانات التحديث القادمة من فورم HTML - نفس فكرة
-/// MergedBrandData في قسم الـ API، بنستخدمها كمدخل موحّد لدالة الـ validate
-/// بدل ما نكرر التحقق جوه UpdateBrandForm مباشرة. الفايدة عمليًا هنا إنك
-/// لو حبيت مستقبلًا تسمح بتعديل جزئي حتى من الفورم (مثلاً عبر JS/AJAX)،
-/// تقدر تبني MergedBrandFormData من (القيم الجديدة المرسلة + القيم القديمة
-/// من قاعدة البيانات) من غير ما تلمس منطق التحقق نفسه.
+/// Unified validator target for Web Forms.
 pub struct MergedBrandFormData<'a> {
     pub name: &'a str,
     pub name_ar: &'a str,
 }
 
 impl<'a> MergedBrandFormData<'a> {
-    /// يتحقق من صحة البيانات النهائية بعد الدمج (نفس رسائل UpdateBrandForm)
+    /// Validates submitted form values with user-friendly Arabic validation errors.
     pub fn validate(&self) -> Result<(), String> {
         let trimmed_name = self.name.trim();
         if trimmed_name.is_empty() {
@@ -224,8 +217,7 @@ impl<'a> MergedBrandFormData<'a> {
 }
 
 impl UpdateBrandForm {
-    /// يتحقق من صحة بيانات تحديث البراند القادمة من الفورم
-    /// (بيمرّر البيانات لـ MergedBrandFormData::validate للحفاظ على تركيب موحّد)
+    /// Delegates form validation to `MergedBrandFormData` to enforce DRY validation patterns.
     pub fn validate(&self) -> Result<(), String> {
         let merged = MergedBrandFormData {
             name: &self.name,
@@ -235,11 +227,11 @@ impl UpdateBrandForm {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 2.3 Askama Template
-// ---------------------------------------------------------------------------
+// ============================================================================
+// SECTION 4: ASKAMA TEMPLATES & UI FILTERS
+// ============================================================================
 
-/// قالب الـ Askama لعرض وإدارة البراندات في صفحات الويب
+/// Main page Askama template rendering brand management dashboard (`brands.html`).
 #[derive(Template, WebTemplate)]
 #[template(path = "brands.html")]
 pub struct BrandsTemplate {
@@ -249,33 +241,7 @@ pub struct BrandsTemplate {
     pub edit_brand: Option<BrandResponseDto>,
 }
 
-pub mod filters {
-    use askama::Values;
-
-    /// يرجّع أول حرف من اسم البراند (Capital) لعرضه داخل الـ avatar الدائري
-    #[askama::filter_fn]
-pub fn first_letter(name: &str, _values: &dyn Values) -> askama::Result<String> {
-    Ok(name
-        .trim() // 1. إزالة أي مسافات زائدة من بداية أو نهاية النص
-        .chars()
-        .next()
-        .map(|c| c.to_uppercase().to_string())
-        .unwrap_or_else(|| "؟".to_string())) // 2. إرجاع علامة استفهام عربية عند الفراغ
-}
-
-    /// يولّد لون خلفية ثابت للـ avatar بناءً على اسم البراند — نفس الاسم
-    /// دايمًا هياخد نفس اللون (مش عشوائي في كل تحميل للصفحة)
-    #[askama::filter_fn]
-    pub fn initial_color(name: &str, _values: &dyn Values) -> askama::Result<String> {
-        const PALETTE: [&str; 6] =
-            ["#0E7C66", "#2563EB", "#D97706", "#7C3AED", "#DB2777", "#0891B2"];
-        let sum: u32 = name.bytes().map(|b| b as u32).sum();
-        Ok(PALETTE[sum as usize % PALETTE.len()].to_string())
-    }
-}
-
-
-
+/// Partial HTML snippet template for HTMX/Dynamic live brand search.
 #[derive(Template, WebTemplate)]
 #[template(path = "partials/brand_search_results.html")]
 pub struct BrandSearchResultsTemplate {
@@ -283,9 +249,39 @@ pub struct BrandSearchResultsTemplate {
     pub query: String,
 }
 
+/// URL Query parameter extractor for brand live-search requests.
 #[derive(Debug, Deserialize)]
 pub struct BrandSearchQuery {
     #[serde(default)]
     pub q: String,
-    
+}
+
+// ---------------------------------------------------------------------------
+// 4.1 Custom Askama Filters
+// ---------------------------------------------------------------------------
+
+pub mod filters {
+    use askama::Values;
+
+    /// Extract the capitalized initial character of a brand name for UI avatar circles.
+    #[askama::filter_fn]
+    pub fn first_letter(name: &str, _values: &dyn Values) -> askama::Result<String> {
+        Ok(name
+            .trim()
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().to_string())
+            .unwrap_or_else(|| "؟".to_string()))
+    }
+
+    /// Generates a deterministic hex color code based on the brand string hash.
+    /// Ensures the same brand always gets the exact same avatar background color across renders.
+    #[askama::filter_fn]
+    pub fn initial_color(name: &str, _values: &dyn Values) -> askama::Result<String> {
+        const PALETTE: [&str; 6] = [
+            "#0E7C66", "#2563EB", "#D97706", "#7C3AED", "#DB2777", "#0891B2",
+        ];
+        let sum: u32 = name.bytes().map(|b| b as u32).sum();
+        Ok(PALETTE[sum as usize % PALETTE.len()].to_string())
+    }
 }

@@ -11,6 +11,10 @@ use axum::{
     Json, Router,
 };
 
+// ============================================================================
+// ROUTER CONFIGURATION
+// ============================================================================
+
 /// Configures and returns the sub-router for all brand-related JSON API endpoints.
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -20,15 +24,21 @@ pub fn router() -> Router<AppState> {
         .route("/{id}", get(get_brand))
         // POST /api/brands -> Create a new brand
         .route("/", post(create_brand))
-        // PATCH /api/brands/{id} -> Partial update (matches the optional-fields DTO)
+        // PATCH /api/brands/{id} -> Partial update (supports optional payload fields)
         .route("/{id}", patch(update_brand))
-        // DELETE /api/brands/{id} -> Delete a brand
+        // DELETE /api/brands/{id} -> Delete a brand by ID
         .route("/{id}", delete(delete_brand))
 }
 
-// ==================== 1. List Brands ====================
+// ============================================================================
+// HANDLERS: READ OPERATIONS (GET)
+// ============================================================================
 
-/// Returns all brands ordered by ID descending (most recent first).
+// ---------------------------------------------------------------------------
+// 1. List Brands
+// ---------------------------------------------------------------------------
+
+/// Retrieves all brands sorted in descending order by ID (newest first).
 pub async fn list_brands(State(state): State<AppState>) -> impl IntoResponse {
     let brands = sqlx::query_as!(
         BrandResponseDto,
@@ -50,7 +60,8 @@ pub async fn list_brands(State(state): State<AppState>) -> impl IntoResponse {
             };
             (StatusCode::OK, Json(response)).into_response()
         }
-        Err(_) => {
+        Err(err) => {
+            tracing::error!("Failed to fetch brands list: {:?}", err);
             let response = ApiResponse::<Vec<BrandResponseDto>>::error(
                 StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                 "Internal server error occurred".to_string(),
@@ -60,9 +71,11 @@ pub async fn list_brands(State(state): State<AppState>) -> impl IntoResponse {
     }
 }
 
-// ==================== 2. Get Brand by ID ====================
+// ---------------------------------------------------------------------------
+// 2. Get Brand by ID
+// ---------------------------------------------------------------------------
 
-/// Retrieves a single brand by its ID.
+/// Retrieves a single brand entity by its unique identifier.
 pub async fn get_brand(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -95,7 +108,8 @@ pub async fn get_brand(
             );
             (StatusCode::NOT_FOUND, Json(response)).into_response()
         }
-        Err(_) => {
+        Err(err) => {
+            tracing::error!("Failed to fetch brand with ID {}: {:?}", id, err);
             let response = ApiResponse::<BrandResponseDto>::error(
                 StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                 "Internal server error occurred".to_string(),
@@ -105,14 +119,20 @@ pub async fn get_brand(
     }
 }
 
-// ==================== 3. Create Brand ====================
+// ============================================================================
+// HANDLERS: WRITE OPERATIONS (POST, PATCH, DELETE)
+// ============================================================================
 
-/// Creates a new brand after validating the incoming payload.
+// ---------------------------------------------------------------------------
+// 3. Create Brand
+// ---------------------------------------------------------------------------
+
+/// Creates a new brand entity after validating the payload.
 pub async fn create_brand(
     State(state): State<AppState>,
     Json(payload): Json<CreateBrandDto>,
 ) -> impl IntoResponse {
-    // 1. Validate the incoming payload
+    // 1. Validation check
     if let Err((status, message)) = payload.validate() {
         let response = ApiResponse::<()>::error(status.as_u16(), message);
         return (status, Json(response)).into_response();
@@ -121,7 +141,7 @@ pub async fn create_brand(
     let trimmed_name = payload.name.trim();
     let trimmed_name_ar = payload.name_ar.trim();
 
-    // 2. Insert the new brand into the database
+    // 2. Database Insert Operation
     let inserted_brand = sqlx::query_as!(
         BrandResponseDto,
         r#"
@@ -136,6 +156,7 @@ pub async fn create_brand(
     .fetch_one(&state.pool)
     .await;
 
+    // 3. Response handling
     match inserted_brand {
         Ok(brand) => {
             let response = ApiResponse {
@@ -145,6 +166,7 @@ pub async fn create_brand(
             };
             (StatusCode::CREATED, Json(response)).into_response()
         }
+        // Error 23505: Unique Constraint Violation (اسم مكرر)
         Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
             let response = ApiResponse::<()>::error(
                 StatusCode::BAD_REQUEST.as_u16(),
@@ -152,7 +174,8 @@ pub async fn create_brand(
             );
             (StatusCode::BAD_REQUEST, Json(response)).into_response()
         }
-        Err(_) => {
+        Err(err) => {
+            tracing::error!("Failed to create brand: {:?}", err);
             let response = ApiResponse::<()>::error(
                 StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                 "Failed to insert brand into database".to_string(),
@@ -162,16 +185,17 @@ pub async fn create_brand(
     }
 }
 
-// ==================== 4. Update Brand (Partial - PATCH) ====================
+// ---------------------------------------------------------------------------
+// 4. Update Brand (PATCH)
+// ---------------------------------------------------------------------------
 
-/// Partially updates a brand. Only the fields present in the payload are changed;
-/// any field left out (`None`) keeps its existing value.
+/// Updates specific fields of an existing brand. Unspecified fields (`None`) retain current values.
 pub async fn update_brand(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(payload): Json<UpdateBrandDto>,
 ) -> impl IntoResponse {
-    // 1. Fetch the existing brand to confirm it exists
+    // 1. Fetch current record to verify existence
     let old_brand = match sqlx::query_as!(
         BrandResponseDto,
         r#"
@@ -192,7 +216,8 @@ pub async fn update_brand(
             );
             return (StatusCode::NOT_FOUND, Json(response)).into_response();
         }
-        Err(_) => {
+        Err(err) => {
+            tracing::error!("Failed to fetch brand before updating (ID {}): {:?}", id, err);
             let response = ApiResponse::<()>::error(
                 StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                 "Database error while fetching brand".to_string(),
@@ -201,12 +226,12 @@ pub async fn update_brand(
         }
     };
 
-    // 2. Merge incoming values with the existing ones (PATCH semantics)
+    // 2. Apply PATCH semantics (Merge new inputs with existing entity data)
     let final_name = payload.name.as_deref().unwrap_or(&old_brand.name);
     let final_name_ar = payload.name_ar.as_deref().unwrap_or(&old_brand.name_ar);
     let final_notes = payload.notes.clone().or_else(|| old_brand.notes.clone());
 
-    // 3. Early exit if nothing actually changed
+    // 3. Early return if payload causes no state change
     if final_name == old_brand.name
         && final_name_ar == old_brand.name_ar
         && final_notes == old_brand.notes
@@ -219,7 +244,7 @@ pub async fn update_brand(
         return (StatusCode::OK, Json(response)).into_response();
     }
 
-    // 4. Validate the merged (final) values
+    // 4. Validate merged values
     let merged = MergedBrandData {
         name: final_name,
         name_ar: final_name_ar,
@@ -233,7 +258,7 @@ pub async fn update_brand(
     let trimmed_name = final_name.trim();
     let trimmed_name_ar = final_name_ar.trim();
 
-    // 5. Persist the update
+    // 5. Save changes to DB
     let updated_brand = sqlx::query_as!(
         BrandResponseDto,
         r#"
@@ -259,6 +284,7 @@ pub async fn update_brand(
             };
             (StatusCode::OK, Json(response)).into_response()
         }
+        // Error 23505: Unique Constraint Violation (اسم مكرر)
         Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
             let response = ApiResponse::<()>::error(
                 StatusCode::BAD_REQUEST.as_u16(),
@@ -266,7 +292,8 @@ pub async fn update_brand(
             );
             (StatusCode::BAD_REQUEST, Json(response)).into_response()
         }
-        Err(_) => {
+        Err(err) => {
+            tracing::error!("Failed to update brand ID {}: {:?}", id, err);
             let response = ApiResponse::<()>::error(
                 StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                 "Failed to update brand in database".to_string(),
@@ -276,16 +303,15 @@ pub async fn update_brand(
     }
 }
 
-// ==================== 5. Delete Brand ====================
+// ---------------------------------------------------------------------------
+// 5. Delete Brand
+// ---------------------------------------------------------------------------
 
-/// Deletes a brand by ID.
-/// Fails with a clear message if the brand still has related records
-/// (e.g. products) pointing to it via a foreign key.
+/// Deletes a brand entity by ID. Handles foreign key constraint errors gracefully.
 pub async fn delete_brand(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> impl IntoResponse {
-    // Attempt the delete directly; RETURNING tells us whether a row actually existed
     let result = sqlx::query!(
         r#"
         DELETE FROM brands
@@ -298,7 +324,7 @@ pub async fn delete_brand(
     .await;
 
     match result {
-        // Brand found and deleted successfully
+        // Successful deletion
         Ok(Some(_)) => {
             let response = ApiResponse {
                 status: StatusCode::OK.as_u16(),
@@ -307,7 +333,7 @@ pub async fn delete_brand(
             };
             (StatusCode::OK, Json(response)).into_response()
         }
-        // No brand with this ID
+        // Entity not found
         Ok(None) => {
             let response = ApiResponse::<()>::error(
                 StatusCode::NOT_FOUND.as_u16(),
@@ -315,8 +341,7 @@ pub async fn delete_brand(
             );
             (StatusCode::NOT_FOUND, Json(response)).into_response()
         }
-        // 23503: foreign key violation - happens when other records (e.g. products)
-        // still reference this brand
+        // Error 23503: Foreign Key Violation (مرتبط بسجلات أخرى مثل المنتجات)
         Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23503") => {
             let response = ApiResponse::<()>::error(
                 StatusCode::BAD_REQUEST.as_u16(),
@@ -324,8 +349,8 @@ pub async fn delete_brand(
             );
             (StatusCode::BAD_REQUEST, Json(response)).into_response()
         }
-        // Any other database error
-        Err(_) => {
+        Err(err) => {
+            tracing::error!("Failed to delete brand ID {}: {:?}", id, err);
             let response = ApiResponse::<()>::error(
                 StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                 "Failed to delete brand from database".to_string(),
@@ -334,5 +359,3 @@ pub async fn delete_brand(
         }
     }
 }
-
-

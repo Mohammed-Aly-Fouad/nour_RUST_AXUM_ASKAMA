@@ -1,76 +1,54 @@
 /* ==========================================================================
-   1. التحكم في النافذة المنبثقة (Modal)
+   1. Dynamic Toast & Alert System
    ========================================================================== */
-function openBrandModal() {
-  const modal = document.getElementById('brand-modal');
-  if (modal) {
-    modal.classList.add('active');
-  }
-}
 
-function closeBrandModal(e) {
-  if (e && e.preventDefault) {
-    e.preventDefault();
-  }
-  const modal = document.getElementById('brand-modal');
-  if (modal) {
-    modal.classList.remove('active');
-  }
-
-  // إذا كنا في صفحة تعديل (/web/brands/edit/id)، ارجع للرابط الرئيسي دون إعادة تحميل
-  if (window.location.pathname.includes('/edit/')) {
-    window.history.replaceState({}, document.title, '/web/brands');
-  }
-}
-
-/* ==========================================================================
-   2. إغلاق الـ Modal وقائمة البحث عند النقر خارجها
-   ========================================================================== */
-window.addEventListener('click', function (e) {
-  const modal = document.getElementById('brand-modal');
-  if (e.target === modal) {
-    closeBrandModal(e);
-  }
-
-  // إغلاق قائمة نتائج البحث المنسدلة عند النقر خارجها
-  const searchContainer = document.querySelector('.search-container');
-  const searchResults = document.getElementById('search-results');
-  if (searchContainer && searchResults && !searchContainer.contains(e.target)) {
-    searchResults.innerHTML = '';
-  }
-});
-
-/* ==========================================================================
-   3. نظام التنبيهات (Toasts / Alerts)
-   ========================================================================== */
+/**
+ * Dismisses a toast element when the close button is clicked.
+ * @param {HTMLElement} btn - The close button element inside the toast.
+ */
 function dismissToast(btn) {
-  const toast = btn.closest('[data-toast]') || btn.closest('.toast');
+  const toast = btn.closest('[data-toast]') || btn.closest('.alert-toast') || btn.closest('.toast');
   if (toast) {
     dismissToastElement(toast);
   }
 }
 
+/**
+ * Handles smooth fade-out animation and removes the toast element from DOM.
+ * @param {HTMLElement} toastEl - The target toast element.
+ */
 function dismissToastElement(toastEl) {
   if (!toastEl) return;
-  toastEl.classList.add('toast-hiding', 'fade-out');
+  
+  // Apply CSS transition classes (compatible with CSS fade-out)
+  toastEl.classList.add('fade-out', 'toast-hide', 'toast-hiding');
+  
   setTimeout(() => {
     toastEl.remove();
-  }, 400);
+  }, 400); // Matches CSS transition duration
 }
 
-// تشغيل عند اكتمال تحميل الصفحة
+/* ==========================================================================
+   2. Global Event Listeners & Initializations
+   ========================================================================== */
+
 document.addEventListener('DOMContentLoaded', () => {
-  // أ) تنظيف الـ URL من ?ok= لتجنب تكرار التنبيه عند عمل Refresh
-  if (window.location.search.includes('ok=')) {
+  // ------------------------------------------------------------------------
+  // A) Clean URL Query String (e.g., ?ok=... or ?error=...)
+  // Prevents re-triggering toast alerts on page refresh.
+  // ------------------------------------------------------------------------
+  if (window.location.search) {
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
   }
 
-  // ب) تفعيل التوقيت التلقائي (5 ثوان) وشريط التقدم لجميع التنبيهات الموجودة
-  const toasts = document.querySelectorAll('[data-toast], .toast, #flash-alert');
-  
+  // ------------------------------------------------------------------------
+  // B) Auto-dismiss Flash Toasts with Progress Bar Support
+  // ------------------------------------------------------------------------
+  const toasts = document.querySelectorAll('[data-toast], .alert-toast, .toast, #flash-alert');
+
   toasts.forEach((toast) => {
-    // تشغيل أنيميشن شريط التقدم إن وجد
+    // Optional: Animate internal progress bar if present
     const barFill = toast.querySelector('.toast-bar-fill');
     if (barFill) {
       barFill.style.transition = 'width 5s linear';
@@ -79,9 +57,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 50);
     }
 
-    // إخفاء التوست تلقائياً بعد 5 ثوانٍ
+    // Dismiss toast after 5 seconds
     setTimeout(() => {
       dismissToastElement(toast);
     }, 5000);
   });
+});
+
+/* ==========================================================================
+   3. Global Outside Click Handler (Dropdowns & Active Overlays)
+   ========================================================================== */
+
+window.addEventListener('click', (e) => {
+  // Close any search results dropdown when clicking outside the container
+  const searchContainer = document.querySelector('.search-container');
+  const searchResults = document.getElementById('search-results');
+  
+  if (searchContainer && searchResults && !searchContainer.contains(e.target)) {
+    searchResults.innerHTML = '';
+  }
 });
