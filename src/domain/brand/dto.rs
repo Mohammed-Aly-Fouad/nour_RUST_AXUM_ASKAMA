@@ -1,3 +1,4 @@
+use crate::domain::brand::model::Brand;
 use askama::Template;
 use askama_web::WebTemplate;
 use axum::http::StatusCode;
@@ -240,7 +241,7 @@ impl UpdateBrandForm {
 
 /// قالب الـ Askama لعرض وإدارة البراندات في صفحات الويب
 #[derive(Template, WebTemplate)]
-#[template(path = "brands.html")]
+#[template(path = "test-brands.html")]
 pub struct BrandsTemplate {
     pub brands: Vec<BrandResponseDto>,
     pub error_message: Option<String>,
@@ -253,13 +254,14 @@ pub mod filters {
 
     /// يرجّع أول حرف من اسم البراند (Capital) لعرضه داخل الـ avatar الدائري
     #[askama::filter_fn]
-    pub fn first_letter(name: &str, _values: &dyn Values) -> askama::Result<String> {
-        Ok(name
-            .chars()
-            .next()
-            .map(|c| c.to_uppercase().to_string())
-            .unwrap_or_else(|| "?".to_string()))
-    }
+pub fn first_letter(name: &str, _values: &dyn Values) -> askama::Result<String> {
+    Ok(name
+        .trim() // 1. إزالة أي مسافات زائدة من بداية أو نهاية النص
+        .chars()
+        .next()
+        .map(|c| c.to_uppercase().to_string())
+        .unwrap_or_else(|| "؟".to_string())) // 2. إرجاع علامة استفهام عربية عند الفراغ
+}
 
     /// يولّد لون خلفية ثابت للـ avatar بناءً على اسم البراند — نفس الاسم
     /// دايمًا هياخد نفس اللون (مش عشوائي في كل تحميل للصفحة)
@@ -270,4 +272,17 @@ pub mod filters {
         let sum: u32 = name.bytes().map(|b| b as u32).sum();
         Ok(PALETTE[sum as usize % PALETTE.len()].to_string())
     }
+}
+
+//################ TEST
+#[derive(Template, WebTemplate)]
+#[template(path = "brand_search_results.html")]
+pub struct BrandSearchResultsTemplate {
+    pub brands: Vec<BrandResponseDto>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BrandSearchQuery {
+    #[serde(default)]
+    pub q: String,
 }

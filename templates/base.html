@@ -15,59 +15,13 @@
 </head>
 <body>
 
-  <!-- ==================== Sidebar Nav ==================== -->
-  <aside class="sidebar">
-    <div class="brand-mark"><span class="dot"></span> لوحة التحكم</div>
-    <ul class="nav-list">
-      <li>
-        <a href="/web/brands" class="{% block nav_brands %}{% endblock %}">
-          <span class="nav-icon">ب</span>
-          البراندات
-        </a>
-      </li>
-      <li>
-        <a href="/web/categories" class="{% block nav_categories %}{% endblock %}">
-          <span class="nav-icon">ف</span>
-          الفئات
-        </a>
-      </li>
-      <li>
-        <a href="/web/products" class="{% block nav_products %}{% endblock %}">
-          <span class="nav-icon">م</span>
-          المنتجات
-        </a>
-      </li>
-      <li>
-        <a href="/web/product-variants" class="{% block nav_variants %}{% endblock %}">
-          <span class="nav-icon">م</span>
-          متغيرات المنتج
-        </a>
-      </li>
-    </ul>
-  </aside>
+  <!-- Sidebar Component -->
+  {% include "components/sidebar.html" %}
 
-  <!-- ==================== Toast Container ==================== -->
-  <div id="toast-container">
-    {% if let Some(msg) = success_message %}
-      <div class="toast toast-success" data-toast>
-        <span class="toast-icon">✓</span>
-        <span class="toast-text">{{ msg }}</span>
-        <button class="toast-close" type="button" onclick="dismissToast(this)">✕</button>
-        <div class="toast-bar"><div class="toast-bar-fill"></div></div>
-      </div>
-    {% endif %}
+  <!-- Toast Component -->
+  {% include "components/toast.html" %}
 
-    {% if let Some(msg) = error_message %}
-      <div class="toast toast-error" data-toast>
-        <span class="toast-icon">!</span>
-        <span class="toast-text">{{ msg }}</span>
-        <button class="toast-close" type="button" onclick="dismissToast(this)">✕</button>
-        <div class="toast-bar"><div class="toast-bar-fill"></div></div>
-      </div>
-    {% endif %}
-  </div>
-
-  <!-- ==================== Main Content ==================== -->
+  <!-- Main Content Area -->
   <main class="main">
     {% block content %}{% endblock %}
   </main>

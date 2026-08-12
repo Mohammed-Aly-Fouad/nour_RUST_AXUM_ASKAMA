@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::domain::brand::dto::{
-    BrandResponseDto, BrandsTemplate, CreateBrandForm, MergedBrandFormData, UpdateBrandForm,
+    BrandResponseDto, BrandsTemplate, CreateBrandForm, MergedBrandFormData, UpdateBrandForm, BrandSearchResultsTemplate, BrandSearchQuery
 };
 use crate::state::AppState;
 
@@ -22,6 +22,7 @@ pub fn router() -> Router<AppState> {
         .route("/update/{id}", post(update_brand_web))
         // GET /brands/delete/{id} -> Handle brand deletion
         .route("/delete/{id}", post(delete_brand_web))
+        .route("/search", get(search_brands_handler))
 }
 
 // ============================================================================
@@ -279,4 +280,41 @@ pub async fn delete_brand_web(
         }
         .into_response(),
     }
+}
+
+
+// #################### TEST ##############
+pub async fn search_brands_handler(
+    State(state): State<AppState>,
+    Query(query): Query<BrandSearchQuery>,
+) -> Result<impl IntoResponse, axum::http::StatusCode> {
+    let q = query.q.trim();
+
+    // إذا كان نص البحث فارغاً، نرجع قائمة فارغة فوراً
+    if q.is_empty() {
+        return Ok(BrandSearchResultsTemplate { brands: vec![] });
+    }
+
+    // البحث في الاسم العربي والاسم الإنجليزي بدون حساسية لحالة الأحرف
+    let search_pattern = format!("%{}%", q);
+
+    let brands = sqlx::query_as!(
+        BrandResponseDto,
+        r#"
+        SELECT id, name, name_ar, notes, created_at, updated_at
+        FROM brands
+        WHERE name ILIKE $1 OR name_ar ILIKE $1
+        ORDER BY name_ar ASC
+        LIMIT 10
+        "#,
+        search_pattern
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| {
+        tracing::error!("Failed to search brands: {:?}", err);
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(BrandSearchResultsTemplate { brands })
 }
