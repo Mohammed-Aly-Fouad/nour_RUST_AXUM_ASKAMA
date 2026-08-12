@@ -1,21 +1,13 @@
 {% if brands.is_empty() %}
-  <div class="search-no-results">
-    <span>لا توجد نتائج مطابقة</span>
-  </div>
+    <div class="search-dropdown-item no-results">
+        <span>لا توجد نتائج تطابق "{{ query }}"</span>
+    </div>
 {% else %}
-  <ul class="search-results-list">
-    {% for brand in brands %}
-      <li class="search-result-item">
-        <a href="/web/brands/edit/{{ brand.id }}" class="search-result-link">
-          <span class="avatar-sm" style="background: {{ brand.name|initial_color }};">
-            {{ brand.name|first_letter }}
-          </span>
-          <div class="search-result-info">
-            <span class="name-ar">{{ brand.name_ar }}</span>
-            <span class="name-en">{{ brand.name }}</span>
-          </div>
-        </a>
-      </li>
-    {% endfor %}
-  </ul>
+   {% for brand in brands %}
+    <!-- غيّر الرابط هنا ليكون /edit/id بدلاً من ?edit=id -->
+    <a href="/web/brands/edit/{{ brand.id }}" class="search-dropdown-item">
+        <span class="item-name-ar">{{ brand.name_ar }}</span>
+        <span class="item-name-en">{{ brand.name }}</span>
+    </a>
+{% endfor %}
 {% endif %}

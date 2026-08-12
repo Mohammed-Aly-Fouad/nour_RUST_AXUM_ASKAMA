@@ -1,39 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}إدارة البراندات - لوحة التحكم{% endblock %}
+{% block title %}إدارة البراندات{% endblock %}
+
 {% block nav_brands %}active{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="/assets/css/main.css">
+<link rel="stylesheet" href="/assets/css/brands.css">
+
+{% endblock %}
+
 {% block content %}
-  <!-- Header with Search Component -->
-  {% include "components/header_search.html" %}
 
-  <!-- Main Grid Section -->
-  <section class="brands-grid">
-    {% for brand in brands %}
-      <div class="brand-card">
-        <div class="card-header">
-          <span class="avatar" style="background: {{ brand.name|initial_color }};">
-            {{ brand.name|first_letter }}
-          </span>
-          <div class="card-title">
-            <h3>{{ brand.name_ar }}</h3>
-            <span class="subtitle">{{ brand.name }}</span>
-          </div>
-        </div>
+{% include "components/header_toolbar.html" %}
 
-        <div class="card-footer">
-          <a href="/web/brands/edit/{{ brand.id }}" class="btn-link">تعديل</a>
-          <button 
-            type="button" 
-            class="btn-link danger" 
-            hx-delete="/web/brands/{{ brand.id }}" 
-            hx-confirm="هل أنت تأكد من حذف هذا البراند؟"
-          >
-            حذف
-          </button>
-          <span class="created-at">{{ brand.created_at }}</span>
-        </div>
-      </div>
-    {% endfor %}
-  </section>
+
+{% include "components/card_grid.html"%}
+
+{% include "components/modal_brand.html" %}
+
+
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/main.js" defer></script>
 {% endblock %}

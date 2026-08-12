@@ -241,7 +241,7 @@ impl UpdateBrandForm {
 
 /// قالب الـ Askama لعرض وإدارة البراندات في صفحات الويب
 #[derive(Template, WebTemplate)]
-#[template(path = "test-brands.html")]
+#[template(path = "brands.html")]
 pub struct BrandsTemplate {
     pub brands: Vec<BrandResponseDto>,
     pub error_message: Option<String>,
@@ -274,15 +274,18 @@ pub fn first_letter(name: &str, _values: &dyn Values) -> askama::Result<String> 
     }
 }
 
-//################ TEST
+
+
 #[derive(Template, WebTemplate)]
-#[template(path = "brand_search_results.html")]
+#[template(path = "partials/brand_search_results.html")]
 pub struct BrandSearchResultsTemplate {
     pub brands: Vec<BrandResponseDto>,
+    pub query: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct BrandSearchQuery {
     #[serde(default)]
     pub q: String,
+    
 }

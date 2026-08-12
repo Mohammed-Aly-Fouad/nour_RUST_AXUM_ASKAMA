@@ -85,6 +85,7 @@ pub async fn render_brands_page(
     let success_message = match params.ok.as_deref() {
         Some("created") => Some("تم إضافة البراند بنجاح".to_string()),
         Some("updated") => Some("تم تعديل البراند بنجاح".to_string()),
+        Some("deleted") => Some("تم حذف البراند بنجاح".to_string()), // 👈 أضف هذا السطر
         _ => None,
     };
 
@@ -258,7 +259,7 @@ pub async fn delete_brand_web(
         .await;
 
     match result {
-        Ok(_) => Redirect::to("/web/brands").into_response(),
+        Ok(_) => Redirect::to("/web/brands?ok=deleted").into_response(),
         // 23503: foreign key violation - نفس المنطق بالظبط اللي في الـ API
         Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23503") => {
             BrandsTemplate {
@@ -283,7 +284,6 @@ pub async fn delete_brand_web(
 }
 
 
-// #################### TEST ##############
 pub async fn search_brands_handler(
     State(state): State<AppState>,
     Query(query): Query<BrandSearchQuery>,
@@ -292,7 +292,10 @@ pub async fn search_brands_handler(
 
     // إذا كان نص البحث فارغاً، نرجع قائمة فارغة فوراً
     if q.is_empty() {
-        return Ok(BrandSearchResultsTemplate { brands: vec![] });
+        return Ok(BrandSearchResultsTemplate {
+            brands: vec![],
+            query: String::new(), // <-- Added here
+        });
     }
 
     // البحث في الاسم العربي والاسم الإنجليزي بدون حساسية لحالة الأحرف
@@ -316,5 +319,8 @@ pub async fn search_brands_handler(
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    Ok(BrandSearchResultsTemplate { brands })
+    Ok(BrandSearchResultsTemplate {
+        brands,
+        query: q.to_string(), // <-- Added here
+    })
 }
