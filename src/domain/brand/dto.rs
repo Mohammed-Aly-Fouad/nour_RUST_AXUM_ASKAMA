@@ -239,6 +239,7 @@ pub struct BrandsTemplate {
     pub error_message: Option<String>,
     pub success_message: Option<String>,
     pub edit_brand: Option<BrandResponseDto>,
+    pub current_page: String,
 }
 
 /// Partial HTML snippet template for HTMX/Dynamic live brand search.

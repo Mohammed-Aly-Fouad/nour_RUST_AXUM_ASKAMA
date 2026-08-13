@@ -2,25 +2,25 @@
   <div class="brand-mark"><span class="dot"></span> لوحة التحكم</div>
   <ul class="nav-list">
     <li>
-      <a href="/web/brands" class="{% block nav_brands %}{% endblock %}">
+      <a href="/web/brands" class="{% if current_page is defined %}{% if current_page == "brands" %}active{% endif %}{% endif %}">
         <span class="nav-icon">ب</span>
         البراندات
       </a>
     </li>
     <li>
-      <a href="/web/categories" class="{% block nav_categories %}{% endblock %}">
+      <a href="/web/categories" class="{% if current_page is defined %}{% if current_page == "categories" %}active{% endif %}{% endif %}">
         <span class="nav-icon">ف</span>
         الفئات
       </a>
     </li>
     <li>
-      <a href="/web/products" class="{% block nav_products %}{% endblock %}">
+      <a href="/web/products" class="{% if current_page is defined %}{% if current_page == "products" %}active{% endif %}{% endif %}">
         <span class="nav-icon">م</span>
         المنتجات
       </a>
     </li>
     <li>
-      <a href="/web/product-variants" class="{% block nav_variants %}{% endblock %}">
+      <a href="/web/product-variants" class="{% if current_page is defined %}{% if current_page == "variants" %}active{% endif %}{% endif %}">
         <span class="nav-icon">م</span>
         متغيرات المنتج
       </a>

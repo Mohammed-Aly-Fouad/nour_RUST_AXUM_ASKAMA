@@ -108,6 +108,7 @@ pub async fn render_brands_page(
         brands: fetch_all_brands(&state).await,
         error_message: None,
         success_message,
+        current_page: "brands".to_string(),
         edit_brand: None,
     }
 }
@@ -121,6 +122,7 @@ pub async fn edit_brand_page(
         brands: fetch_all_brands(&state).await,
         error_message: None,
         success_message: None,
+        current_page: "brands".to_string(),
         edit_brand: fetch_brand_by_id(&state, id).await,
     }
 }
@@ -142,6 +144,7 @@ pub async fn create_brand_web(
             brands: fetch_all_brands(&state).await,
             error_message: Some(err_msg),
             success_message: None,
+            current_page: "brands".to_string(),
             edit_brand: None,
         }
         .into_response();
@@ -169,6 +172,7 @@ pub async fn create_brand_web(
                 brands: fetch_all_brands(&state).await,
                 error_message: Some("اسم البراند موجود بالفعل".to_string()),
                 success_message: None,
+                current_page: "brands".to_string(),
                 edit_brand: None,
             }
             .into_response()
@@ -177,6 +181,7 @@ pub async fn create_brand_web(
             brands: fetch_all_brands(&state).await,
             error_message: Some("حدث خطأ أثناء إضافة البراند، حاول مرة أخرى".to_string()),
             success_message: None,
+            current_page: "brands".to_string(),
             edit_brand: None,
         }
         .into_response(),
@@ -199,6 +204,7 @@ pub async fn update_brand_web(
                 brands: fetch_all_brands(&state).await,
                 error_message: Some("البراند غير موجود".to_string()),
                 success_message: None,
+                current_page: "brands".to_string(),
                 edit_brand: None,
             }
             .into_response();
@@ -216,6 +222,7 @@ pub async fn update_brand_web(
             brands: fetch_all_brands(&state).await,
             error_message: Some(err_msg),
             success_message: None,
+            current_page: "brands".to_string(),
             edit_brand: Some(old_brand),
         }
         .into_response();
@@ -248,6 +255,7 @@ pub async fn update_brand_web(
                 brands: fetch_all_brands(&state).await,
                 error_message: Some("اسم البراند موجود بالفعل".to_string()),
                 success_message: None,
+                current_page: "brands".to_string(),
                 edit_brand: Some(old_brand),
             }
             .into_response()
@@ -256,6 +264,7 @@ pub async fn update_brand_web(
             brands: fetch_all_brands(&state).await,
             error_message: Some("حدث خطأ أثناء تعديل البراند، حاول مرة أخرى".to_string()),
             success_message: None,
+            current_page: "brands".to_string(),
             edit_brand: Some(old_brand),
         }
         .into_response(),
@@ -286,6 +295,7 @@ pub async fn delete_brand_web(
                 ),
                 success_message: None,
                 edit_brand: None,
+                current_page: "brands".to_string(),
             }
             .into_response()
         }
@@ -293,6 +303,7 @@ pub async fn delete_brand_web(
             brands: fetch_all_brands(&state).await,
             error_message: Some("حدث خطأ أثناء حذف البراند".to_string()),
             success_message: None,
+            current_page: "brands".to_string(),
             edit_brand: None,
         }
         .into_response(),
