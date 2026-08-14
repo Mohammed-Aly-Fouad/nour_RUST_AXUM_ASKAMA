@@ -5,7 +5,7 @@
 {% else %}
    {% for category in categories %}
     <!-- غيّر الرابط هنا ليكون /edit/id بدلاً من ?edit=id -->
-    <a href="/web/brands/edit/{{ category.id }}" class="search-dropdown-item">
+    <a href="/web/categories/edit/{{ category.id }}" class="search-dropdown-item">
         <span class="item-name-ar">{{ category.name_ar }}</span>
         <span class="item-name-en">{{ category.name }}</span>
     </a>

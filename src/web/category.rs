@@ -14,6 +14,7 @@ pub fn router() -> Router<AppState> {
         .route("/edit/{id}", get(edit_category_page))
         .route("/update/{id}", post(update_category_web))
         .route("/delete/{id}", post(delete_category_web))
+        .route("/search", get(search_categories_handler))
 }
 
 #[derive(Debug, Deserialize)]
