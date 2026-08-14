@@ -540,7 +540,7 @@ impl CategoryRow {
 }
 
 #[derive(Template, WebTemplate)]
-#[template(path = "categories.html")]
+#[template(path = "categories_new.html")]
 pub struct CategoryTemplate {
     pub categories: Vec<CategoryRow>,
     pub root_categories: Vec<CategoryResponseDto>,
@@ -568,4 +568,28 @@ pub mod filters {
         let sum: u32 = name.bytes().map(|b| b as u32).sum();
         Ok(PALETTE[sum as usize % PALETTE.len()].to_string())
     }
+}
+
+
+
+
+// ============================================================================
+// SECTION 4: ASKAMA TEMPLATES & UI FILTERS
+// ============================================================================
+
+
+
+/// Partial HTML snippet template for HTMX/Dynamic live brand search.
+#[derive(Template, WebTemplate)]
+#[template(path = "partials/category_search_results.html")]
+pub struct CategorySearchResultsTemplate {
+    pub categories: Vec<CategoryResponseDto>,
+    pub query: String,
+}
+
+/// URL Query parameter extractor for brand live-search requests.
+#[derive(Debug, Deserialize)]
+pub struct CategorySearchQuery {
+    #[serde(default)]
+    pub q: String,
 }

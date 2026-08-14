@@ -1,13 +1,10 @@
 use axum::{
-    extract::{Form, Path, Query, State},
-    response::{IntoResponse, Redirect},
-    routing::{get, post},
-    Router,
+    Router, extract::{Form, Path, Query, State}, http::StatusCode, response::{IntoResponse, Redirect}, routing::{get, post},
 };
 use serde::Deserialize;
 
 use crate::domain::category::dto::{
-    CategoryResponseDto, CategoryRow, CategoryTemplate, CreateCategoryForm, UpdateCategoryForm,
+    CategoryResponseDto, CategoryRow, CategorySearchQuery, CategorySearchResultsTemplate, CategoryTemplate, CreateCategoryForm, UpdateCategoryForm,
 };
 use crate::state::AppState;
 
@@ -260,4 +257,53 @@ pub async fn delete_category_web(
             .into_response()
         }
     }
+}
+
+
+
+// ============================================================================
+// HANDLERS: LIVE SEARCH
+// ============================================================================
+
+/// Dynamic search handler returning a rendered Askama partial snippet.
+/// Designed for live search / auto-complete integrations.
+pub async fn search_categories_handler(
+    State(state): State<AppState>,
+    Query(query): Query<CategorySearchQuery>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let q = query.q.trim();
+
+    // إرجاع استجابة فارغة فوراً إن كان الاستعلام خالياً
+    if q.is_empty() {
+        return Ok(CategorySearchResultsTemplate {
+            categories: vec![],
+            query: String::new(),
+        });
+    }
+
+    // إعداد نمط البحث غير حساس للحالة (Case-Insensitive) للغتين العربية والإنجليزية
+    let search_pattern = format!("%{}%", q);
+
+    let categories = sqlx::query_as!(
+        CategoryResponseDto,
+        r#"
+        SELECT id, name, name_ar, parent_id, notes, created_at, updated_at
+        FROM categories
+        WHERE name ILIKE $1 OR name_ar ILIKE $1
+        ORDER BY name_ar ASC
+        LIMIT 10
+        "#,
+        search_pattern
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| {
+        tracing::error!("Failed to execute category search query: {:?}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(CategorySearchResultsTemplate {
+        categories,
+        query: q.to_string(),
+    })
 }
