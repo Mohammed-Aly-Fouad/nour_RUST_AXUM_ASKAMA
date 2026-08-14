@@ -86,6 +86,7 @@ pub async fn render_categories_page(
         categories: CategoryRow::build_rows(&all),
         error_message: None,
         success_message,
+        current_page: "categories".to_string(),
         edit_category: None,
     }
 }
@@ -104,6 +105,7 @@ pub async fn create_category_web(
             categories: CategoryRow::build_rows(&all),
             error_message: Some(err_msg),
             success_message: None,
+            current_page: "categories".to_string(),
             edit_category: None,
         }
         .into_response();
@@ -135,6 +137,7 @@ pub async fn create_category_web(
                 error_message: Some(msg),
                 success_message: None,
                 edit_category: None,
+                current_page: "categories".to_string(),
             }
             .into_response()
         }
@@ -156,6 +159,7 @@ pub async fn edit_category_page(
         error_message: None,
         success_message: None,
         edit_category,
+        current_page: "categories".to_string(),
     }
 }
 
@@ -177,6 +181,7 @@ pub async fn update_category_web(
                 error_message: Some("الفئة غير موجودة".to_string()),
                 success_message: None,
                 edit_category: None,
+                current_page: "categories".to_string(),
             }
             .into_response();
         }
@@ -189,6 +194,7 @@ pub async fn update_category_web(
             error_message: Some(err_msg),
             success_message: None,
             edit_category: Some(old_category),
+            current_page: "categories".to_string(),
         }
         .into_response();
     }
@@ -221,6 +227,7 @@ pub async fn update_category_web(
                 error_message: Some(msg),
                 success_message: None,
                 edit_category: Some(old_category),
+                current_page: "categories".to_string(),
             }
             .into_response()
         }
@@ -253,6 +260,7 @@ pub async fn delete_category_web(
                 error_message: Some(msg),
                 success_message: None,
                 edit_category: None,
+                current_page: "categories".to_string(),
             }
             .into_response()
         }

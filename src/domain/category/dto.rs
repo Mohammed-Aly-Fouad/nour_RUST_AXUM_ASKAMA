@@ -547,6 +547,8 @@ pub struct CategoryTemplate {
     pub error_message: Option<String>,
     pub success_message: Option<String>,
     pub edit_category: Option<CategoryResponseDto>,
+    pub current_page: String,
+
 }
 
 pub mod filters {
