@@ -1,5 +1,5 @@
 use axum::{
-    Router, extract::{Form, Path, Query, State}, http::StatusCode, response::{IntoResponse, Redirect}, routing::{get, post},
+    Json, Router, extract::{Form, Path, Query, State}, http::StatusCode, response::{IntoResponse, Redirect}, routing::{get, post},
 };
 use serde::Deserialize;
 
@@ -10,7 +10,9 @@ use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/", get(render_categories_page).post(create_category_web))
+        .route("/", get(render_categories_page))
+        .route("/category/fetch/{id}", get(fetch_category_by_id))
+        .route("/", post(create_category_web)) // or combine on the same path if applicable
         .route("/edit/{id}", get(edit_category_page))
         .route("/update/{id}", post(update_category_web))
         .route("/delete/{id}", post(delete_category_web))
@@ -36,15 +38,20 @@ async fn fetch_all_categories(state: &AppState) -> Vec<CategoryResponseDto> {
     .unwrap_or_default()
 }
 
-async fn fetch_category_by_id(state: &AppState, id: i32) -> Option<CategoryResponseDto> {
-    sqlx::query_as::<_, CategoryResponseDto>(
-        "SELECT id, name, name_ar, parent_id, notes, created_at, updated_at
-         FROM categories WHERE id = $1",
+
+async fn fetch_category_by_id(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Json<Option<CategoryResponseDto>> {
+    let result = sqlx::query_as::<_, CategoryResponseDto>(
+        "SELECT id, name, name_ar, parent_id, notes, created_at FROM categories WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .unwrap_or(None)
+    .unwrap_or(None);
+
+    Json(result)
 }
 
 /// الفئات الجذعية بس (لملء قائمة اختيار "الفئة الرئيسية")
