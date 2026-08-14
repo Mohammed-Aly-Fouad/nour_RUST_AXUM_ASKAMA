@@ -1,0 +1,46 @@
+<!-- ==================== Cards Grid ==================== -->
+{% if categories.is_empty() %}
+  <div class="card empty-state-card">
+    <div class="empty-state">
+      <div class="empty-icon">ب</div>
+      <p>لا توجد أي فئة مضافة حتى الآن</p>
+      <p class="empty-sub">اضغط على زر "إضافة فئة جديدة" للبدء</p>
+    </div>
+  </div>
+{% else %}
+  <div class="brands-grid">
+    {% for category in categories %}
+      <div class="brand-card">
+        <div class="brand-card-header">
+          <span class="avatar" style="background: {{ category.name|initial_color }};">
+            {{ category.name|first_letter }}
+          </span>
+          <div class="brand-titles">
+            <h3 class="name-ar">{{ category.name_ar }}</h3>
+            <span class="name-en">{{ category.name }}</span>
+          </div>
+        </div>
+
+        <div class="brand-card-body">
+          <p class="brand-notes" title="{% if let Some(notes) = category.notes %}{{ notes }}{% endif %}">
+            {% if let Some(notes) = category.notes %}
+              {{ notes }}
+            {% else %}
+              <span class="no-notes">لا توجد ملاحظات</span>
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="brand-card-footer">
+          <span class="brand-date">{{ category.created_at.format("%Y-%m-%d") }}</span>
+          <div class="card-actions">
+            <a href="/web/categories/edit/{{ category.id }}" class="btn btn-edit-link">تعديل</a>
+            <form method="post" action="/web/categories/delete/{{ category.id }}" onsubmit="return confirm('هل أنت متأكد من حذف هذا البراند؟');">
+              <button type="submit" class="btn btn-danger-link">حذف</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
