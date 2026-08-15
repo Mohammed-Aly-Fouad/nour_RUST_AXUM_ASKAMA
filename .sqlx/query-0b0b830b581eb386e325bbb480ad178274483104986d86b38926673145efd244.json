@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE brands \n        SET name = $1, name_ar = $2, notes = $3, updated_at = now() \n        WHERE id = $4\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0b0b830b581eb386e325bbb480ad178274483104986d86b38926673145efd244"
+}

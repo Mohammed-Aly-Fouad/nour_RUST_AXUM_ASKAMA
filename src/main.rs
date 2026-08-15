@@ -9,9 +9,12 @@ use state::AppState;
 use tower_http::{cors::{Any, CorsLayer}, services::ServeDir};
 use axum::Router;
 use std::net::SocketAddr;
+use dotenvy::dotenv;
 
 #[tokio::main]
+
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenv().ok();
     // 1. Initialize the global logging subscriber (safe against multi-threaded test panics)
     startup::logging();
     tracing::info!("Starting application boot sequence...");
@@ -29,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
-    tracing::debug!("CORS middleware layer configured.");
+    tracing::info!("CORS middleware layer configured.");
 
    // 5. Build the Axum router with state and middleware attached
 let app = Router::new()

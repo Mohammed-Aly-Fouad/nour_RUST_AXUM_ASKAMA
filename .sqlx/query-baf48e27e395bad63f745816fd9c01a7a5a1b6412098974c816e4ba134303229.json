@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT EXISTS(\n                        SELECT 1 FROM product_variants\n                        WHERE barcode = $1 AND id != $2\n                    ) AS \"exists!\"\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "baf48e27e395bad63f745816fd9c01a7a5a1b6412098974c816e4ba134303229"
+}
