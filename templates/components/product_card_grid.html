@@ -1,0 +1,47 @@
+<!-- ==================== Cards Grid ==================== -->
+{% if products.is_empty() %}
+  <div class="card empty-state-card">
+    <div class="empty-state">
+      <div class="empty-icon">ب</div>
+      <p>لا يوجد أي منتج مضاف حتى الآن</p>
+      <p class="empty-sub">اضغط على زر "إضافة منتج جديد" للبدء</p>
+    </div>
+  </div>
+{% else %}
+  <div class="brands-grid">
+    {% for product in products %}
+      <div class="brand-card">
+        <div class="brand-card-header">
+          <span class="avatar" style="background: {{ product.name|initial_color }};">
+            {{ product.name|first_letter }}
+          </span>
+          <div class="brand-titles">
+            <h3 class="name-ar">{{ product.name_ar }}</h3>
+            <span class="name-en">{{ product.name }}</span>
+            <h6 class="name-en">Category_id: {{ product.category_id }}</h6>
+          </div>
+        </div>
+
+        <div class="brand-card-body">
+          <p class="brand-notes" title="{% if let Some(notes) = product.notes %}{{ notes }}{% endif %}">
+            {% if let Some(notes) = product.notes %}
+              {{ notes }}
+            {% else %}
+              <span class="no-notes">لا توجد ملاحظات</span>
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="brand-card-footer">
+          <span class="brand-date">{{ product.created_at.format("%Y-%m-%d") }}</span>
+          <div class="card-actions">
+            <a href="/web/products/edit/{{ product.id }}" class="btn btn-edit-link">تعديل</a>
+            <form method="post" action="/web/products/delete/{{ product.id }}" onsubmit="return confirm('هل أنت متأكد من حذف هذا المنتج');">
+              <button type="submit" class="btn btn-danger-link">حذف</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

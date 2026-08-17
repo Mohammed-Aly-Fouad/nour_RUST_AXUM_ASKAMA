@@ -96,6 +96,7 @@ pub async fn render_categories_page(
         success_message,
         current_page: "categories".to_string(),
         edit_category: None,
+        
     }
 }
 

@@ -79,6 +79,8 @@ pub async fn render_products_page(
         error_message: None,
         success_message,
         edit_product: None,
+        current_page: "products".to_string(),
+        
     }
 }
 
@@ -99,6 +101,7 @@ pub async fn create_product_web(
             error_message: Some(err_msg),
             success_message: None,
             edit_product: None,
+            current_page: "products".to_string(),
         }
         .into_response();
     }
@@ -112,6 +115,7 @@ pub async fn create_product_web(
             error_message: Some("اسم المنتج بالإنجليزية موجود بالفعل".to_string()),
             success_message: None,
             edit_product: None,
+            current_page: "products".to_string(),
         }
         .into_response();
     }
@@ -144,6 +148,7 @@ pub async fn create_product_web(
                 error_message: Some(msg),
                 success_message: None,
                 edit_product: None,
+                current_page: "products".to_string(),
             }
             .into_response()
         }
@@ -166,6 +171,7 @@ pub async fn edit_product_page(
         error_message: None,
         success_message: None,
         edit_product,
+        current_page: "products".to_string(),
     }
 }
 
@@ -188,6 +194,7 @@ pub async fn update_product_web(
                 error_message: Some("المنتج غير موجود".to_string()),
                 success_message: None,
                 edit_product: None,
+                current_page: "products".to_string(),
             }
             .into_response();
         }
@@ -201,6 +208,7 @@ pub async fn update_product_web(
             error_message: Some(err_msg),
             success_message: None,
             edit_product: Some(old_product),
+            current_page: "products".to_string(),
         }
         .into_response();
     }
@@ -217,6 +225,7 @@ pub async fn update_product_web(
             error_message: Some("اسم المنتج بالإنجليزية مستخدم بالفعل لمنتج آخر".to_string()),
             success_message: None,
             edit_product: Some(old_product),
+            current_page: "products".to_string(),
         }
         .into_response();
     }
@@ -251,6 +260,7 @@ pub async fn update_product_web(
                 error_message: Some(msg),
                 success_message: None,
                 edit_product: Some(old_product),
+                current_page: "products".to_string(),
             }
             .into_response()
         }
@@ -284,6 +294,7 @@ pub async fn delete_product_web(
                 error_message: Some(msg),
                 success_message: None,
                 edit_product: None,
+                current_page: "products".to_string(),
             }
             .into_response()
         }

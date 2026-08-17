@@ -304,13 +304,14 @@ impl UpdateProductForm {
 
 /// قالب الـ Askama لعرض وإدارة المنتجات في صفحات الويب
 #[derive(Template, WebTemplate)]
-#[template(path = "products.html")]
+#[template(path = "products_new.html")]
 pub struct ProductsTemplate {
     pub products: Vec<ProductResponseDto>,
     pub categories: Vec<CategoryResponseDto>,
     pub error_message: Option<String>,
     pub success_message: Option<String>,
     pub edit_product: Option<ProductResponseDto>,
+     pub current_page: String,
 }
 
 pub mod filters {

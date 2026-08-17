@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة المنتجات{% endblock %}
+
+{%block head %}
+<link rel="stylesheet" href="/assets/css/main.css" />
+<link rel="stylesheet" href="/assets/css/brands.css" />
+{% endblock %}
+
+{% block content %}
+{% include "components/product_header_toolbar.html" %}
+{% include "components/product_card_grid.html"%}
+{% include "components/product_modal.html"%}
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/main.js" defer></script>
+<script src="/assets/js/brands.js" defer></script>
+{% endblock %}
