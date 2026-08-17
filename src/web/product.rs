@@ -1,12 +1,9 @@
 use axum::{
-    extract::{Form, Path, Query, State},
-    response::{IntoResponse, Redirect},
-    routing::{get, post},
-    Router,
+    Router, extract::{Form, Path, Query, State}, http::StatusCode, response::{IntoResponse, Redirect}, routing::{get, post},
 };
 use serde::Deserialize;
 
-use crate::domain::category::dto::CategoryResponseDto;
+use crate::domain::{category::dto::CategoryResponseDto, product::dto::{ProductSearchQuery, ProductsearchResultsTemplate}};
 use crate::domain::product::dto::{
     CreateProductForm, ProductResponseDto, ProductsTemplate, UpdateProductForm,
 };
@@ -18,6 +15,7 @@ pub fn router() -> Router<AppState> {
         .route("/edit/{id}", get(edit_product_page))
         .route("/update/{id}", post(update_product_web))
         .route("/delete/{id}", post(delete_product_web))
+        .route("/search", get(search_products_handler))
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,7 +40,9 @@ async fn fetch_all_products(state: &AppState) -> Vec<ProductResponseDto> {
 async fn fetch_all_categories(state: &AppState) -> Vec<CategoryResponseDto> {
     sqlx::query_as::<_, CategoryResponseDto>(
         "SELECT id, name, name_ar, parent_id, notes, created_at, updated_at
-         FROM categories ORDER BY name_ar ASC",
+FROM categories 
+WHERE parent_id IS NOT NULL 
+ORDER BY name_ar ASC;",
     )
     .fetch_all(&state.pool)
     .await
@@ -299,4 +299,52 @@ pub async fn delete_product_web(
             .into_response()
         }
     }
+}
+
+
+// ============================================================================
+// HANDLERS: LIVE SEARCH
+// ============================================================================
+
+/// Dynamic search handler returning a rendered Askama partial snippet.
+/// Designed for live search / auto-complete integrations.
+pub async fn search_products_handler(
+    State(state): State<AppState>,
+    Query(query): Query<ProductSearchQuery>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let q = query.q.trim();
+
+    // إرجاع استجابة فارغة فوراً إن كان الاستعلام خالياً
+    if q.is_empty() {
+        return Ok(ProductsearchResultsTemplate {
+            products: vec![],
+            query: String::new(),
+        });
+    }
+
+    // إعداد نمط البحث غير حساس للحالة (Case-Insensitive) للغتين العربية والإنجليزية
+    let search_pattern = format!("%{}%", q);
+
+    let products = sqlx::query_as!(
+        ProductResponseDto,
+        r#"
+        SELECT id, name, name_ar ,category_id, notes, created_at, updated_at
+        FROM products
+        WHERE name ILIKE $1 OR name_ar ILIKE $1
+        ORDER BY name_ar ASC
+        LIMIT 10
+        "#,
+        search_pattern
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| {
+        tracing::error!("Failed to execute brand search query: {:?}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(ProductsearchResultsTemplate {
+        products,
+        query: q.to_string(),
+    })
 }

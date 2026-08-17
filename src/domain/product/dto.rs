@@ -304,7 +304,7 @@ impl UpdateProductForm {
 
 /// قالب الـ Askama لعرض وإدارة المنتجات في صفحات الويب
 #[derive(Template, WebTemplate)]
-#[template(path = "products_new.html")]
+#[template(path = "products.html")]
 pub struct ProductsTemplate {
     pub products: Vec<ProductResponseDto>,
     pub categories: Vec<CategoryResponseDto>,
@@ -312,6 +312,22 @@ pub struct ProductsTemplate {
     pub success_message: Option<String>,
     pub edit_product: Option<ProductResponseDto>,
      pub current_page: String,
+}
+
+
+/// Partial HTML snippet template for HTMX/Dynamic live brand search.
+#[derive(Template, WebTemplate)]
+#[template(path = "partials/product_search_results.html")]
+pub struct ProductsearchResultsTemplate {
+    pub products: Vec<ProductResponseDto>,
+    pub query: String,
+}
+
+/// URL Query parameter extractor for brand live-search requests.
+#[derive(Debug, Deserialize)]
+pub struct ProductSearchQuery {
+    #[serde(default)]
+    pub q: String,
 }
 
 pub mod filters {

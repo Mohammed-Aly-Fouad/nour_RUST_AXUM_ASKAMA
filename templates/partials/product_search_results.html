@@ -1,0 +1,13 @@
+{% if products.is_empty() %}
+    <div class="search-dropdown-item no-results">
+        <span>لا توجد نتائج تطابق "{{ query }}"</span>
+    </div>
+{% else %}
+   {% for product in products %}
+    <!-- غيّر الرابط هنا ليكون /edit/id بدلاً من ?edit=id -->
+    <a href="/web/products/edit/{{ product.id }}" class="search-dropdown-item">
+        <span class="item-name-ar">{{ product.name_ar }}</span>
+        <span class="item-name-en">{{ product.name }}</span>
+    </a>
+{% endfor %}
+{% endif %}

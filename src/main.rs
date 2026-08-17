@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 let app = Router::new()
     .nest("/api", crate::api::router())
     .nest("/web", crate::web::router())
-    .nest_service("/assets", ServeDir::new("assets"))
+    .nest_service("/static", ServeDir::new("static"))
     .layer(cors)
     .with_state(state);
     // 6. Resolve server address from environment variable or fall back to 127.0.0.1:3000

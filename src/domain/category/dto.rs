@@ -540,7 +540,7 @@ impl CategoryRow {
 }
 
 #[derive(Template, WebTemplate)]
-#[template(path = "categories_new.html")]
+#[template(path = "categories.html")]
 pub struct CategoryTemplate {
     pub categories: Vec<CategoryRow>,
     pub root_categories: Vec<CategoryResponseDto>,
