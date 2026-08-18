@@ -745,6 +745,25 @@ pub struct ProductVariantTemplate {
 }
 
 
+
+/// Partial HTML snippet template for HTMX/Dynamic live brand search.
+#[derive(Template, WebTemplate)]
+#[template(path = "partials/product_variants_search_results.html")]
+pub struct ProductVariantsSearchResultsTemplate {
+    pub variants: Vec<ProductVariantResponseDto>,
+    pub query: String,
+}
+
+/// URL Query parameter extractor for brand live-search requests.
+#[derive(Debug, Deserialize)]
+pub struct ProductVarriantsSearchQuery {
+    #[serde(default)]
+    pub q: String,
+}
+
+
+
+
 pub mod filters {
     use askama::Values;
 

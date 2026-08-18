@@ -1,13 +1,10 @@
 use axum::{
-    extract::{Form, Path, Query, State},
-    response::{IntoResponse, Redirect},
-    routing::{get, post},
-    Router,
+    Router, extract::{Form, Path, Query, State}, http::StatusCode, response::{IntoResponse, Redirect}, routing::{get, post},
 };
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::domain::brand::dto::BrandResponseDto;
+use crate::domain::{brand::dto::BrandResponseDto, product_variant::dto::{ProductVariantsSearchResultsTemplate, ProductVarriantsSearchQuery}};
 use crate::domain::product::dto::ProductResponseDto;
 use crate::domain::product_variant::dto::{
     CreateProductVariantForm, ProductVariantResponseDto, ProductVariantRow,
@@ -21,6 +18,7 @@ pub fn router() -> Router<AppState> {
         .route("/edit/{id}", get(edit_variant_page))
         .route("/update/{id}", post(update_variant_web))
         .route("/delete/{id}", post(delete_variant_web))
+        .route("/search", get(search_product_variants_handler))
 }
 
 #[derive(Debug, Deserialize)]
@@ -188,7 +186,7 @@ pub async fn create_variant_web(
     .await;
 
     match result {
-        Ok(_) => Redirect::to("/web/product-variants?ok=created").into_response(),
+        Ok(_) => Redirect::to("/web/product_variants?ok=created").into_response(),
         Err(e) => {
             let msg = if is_unique_violation(&e) {
                 "رمز SKU أو الباركود مستخدم بالفعل".to_string()
@@ -281,7 +279,7 @@ pub async fn update_variant_web(
     .await;
 
     match result {
-        Ok(_) => Redirect::to("/web/product-variants?ok=updated").into_response(),
+        Ok(_) => Redirect::to("/web/product_variants?ok=updated").into_response(),
         Err(e) => {
             let msg = if is_unique_violation(&e) {
                 "رمز SKU أو الباركود مستخدم بالفعل لمتغير آخر".to_string()
@@ -312,7 +310,7 @@ pub async fn delete_variant_web(
     .await;
 
     match result {
-        Ok(_) => Redirect::to("/web/product-variants?ok=deleted").into_response(),
+        Ok(_) => Redirect::to("/web/product_variants?ok=deleted").into_response(),
         Err(e) => {
             let msg = if is_foreign_key_violation(&e) {
                 "لا يمكن حذف هذا المتغير لأنه مرتبط بسجلات أخرى (مثل حركة المخزون أو الفواتير)".to_string()
@@ -325,4 +323,53 @@ pub async fn delete_variant_web(
                 .into_response()
         }
     }
+}
+
+
+
+// ============================================================================
+// HANDLERS: LIVE SEARCH
+// ============================================================================
+
+/// Dynamic search handler returning a rendered Askama partial snippet.
+/// Designed for live search / auto-complete integrations.
+pub async fn search_product_variants_handler(
+    State(state): State<AppState>,
+    Query(query): Query<ProductVarriantsSearchQuery>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let q = query.q.trim();
+
+    // إرجاع استجابة فارغة فوراً إن كان الاستعلام خالياً
+    if q.is_empty() {
+        return Ok(ProductVariantsSearchResultsTemplate {
+            variants: vec![],
+            query: String::new(),
+        });
+    }
+
+    // إعداد نمط البحث غير حساس للحالة (Case-Insensitive) للغتين العربية والإنجليزية
+    let search_pattern = format!("%{}%", q);
+
+    let variants = sqlx::query_as!(
+        ProductVariantResponseDto,
+        r#"
+        SELECT id, name, name_ar, product_id, brand_id, sku, barcode, shelf_location, stock_quantity, reorder_threshold, is_active, attr , notes, created_at, updated_at
+        FROM product_variants
+        WHERE name ILIKE $1 OR name_ar ILIKE $1
+        ORDER BY name_ar ASC
+        LIMIT 10
+        "#,
+        search_pattern
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| {
+        tracing::error!("Failed to execute brand search query: {:?}", err);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(ProductVariantsSearchResultsTemplate {
+        variants,
+        query: q.to_string(),
+    })
 }
