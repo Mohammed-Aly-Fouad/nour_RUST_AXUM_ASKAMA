@@ -25,6 +25,6 @@ fn main() {
         merged.push('\n');
     }
 
-    fs::write("static/css/global.css", merged)
+    fs::write("static/css/main.css", merged)
         .expect("failed to write global.css");
 }

@@ -741,7 +741,9 @@ pub struct ProductVariantTemplate {
     pub error_message: Option<String>,
     pub success_message: Option<String>,
     pub edit_variant: Option<ProductVariantResponseDto>,
+    pub current_page: String,
 }
+
 
 pub mod filters {
     use askama::Values;

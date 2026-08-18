@@ -121,8 +121,10 @@ async fn build_template(
         error_message,
         success_message,
         edit_variant,
-    }
+        current_page: "variants".to_string(),
 }
+    }
+
 
 // ==================== 1. Render main page ====================
 
