@@ -1,18 +1,45 @@
-    function dismissToast(btn) {
-      const toast = btn.closest('[data-toast]');
-      if (!toast) return;
-      toast.classList.add('toast-hide');
-      setTimeout(() => toast.remove(), 200);
-    }
+/* ==========================================================================
+   Brand Domain View Logic & Modal Controls
+   ========================================================================== */
 
-    document.querySelectorAll('[data-toast]').forEach((toast) => {
-      setTimeout(() => {
-        toast.classList.add('toast-hide');
-        setTimeout(() => toast.remove(), 200);
-      }, 5000);
-    });
+/**
+ * Opens the Brand Creation / Edition Modal Dialog.
+ */
+function openBrandModal() {
+  const modal = document.getElementById('brand-modal');
+  if (modal) {
+    modal.classList.add('active');
+  }
+}
 
-    if (window.location.search) {
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
-    }
+/**
+ * Closes the Brand Modal Dialog and handles URL state cleanup.
+ * @param {Event} [e] - Optional click event object.
+ */
+function closeBrandModal(e) {
+  if (e && e.preventDefault) {
+    e.preventDefault();
+  }
+
+  const modal = document.getElementById('brand-modal');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+
+  // If currently on an edit route (/web/brands/edit/:id), restore clean URL without page reload
+  if (window.location.pathname.includes('/edit/')) {
+    window.history.replaceState({}, document.title, '/web/products');
+  }
+}
+
+/* ==========================================================================
+   Brand Page Specific Event Listeners
+   ========================================================================== */
+
+// Close brand modal when clicking directly on the dark overlay background
+window.addEventListener('click', (e) => {
+  const modal = document.getElementById('brand-modal');
+  if (e.target === modal) {
+    closeBrandModal(e);
+  }
+});

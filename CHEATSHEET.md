@@ -7,6 +7,17 @@ git clone <url>                   # copy a remote repo
 git config user.name "Name"
 git config user.email "you@mail"
 ```
+## Git pull
+```bash
+# 1. Fetch the latest changes from the remote repository
+git fetch origin
+
+# 2. Hard reset your current branch to match the remote branch (replace 'main' with your branch name)
+git reset --hard origin/main
+
+# 3. Remove any files that not in main branch
+ git clean -fd  
+```
 
 ## Git — Daily Flow
 ```
@@ -66,7 +77,22 @@ git show <commit>                 # show a specific commit
 git reset --hard HEAD
 git clean -fd
 ---
+## Git push
+```bash
+git push --force-with-lease origin main    # Safest
+git push -f origin main
+```
+## Git pull
+```bash
+# 1. Fetch the latest changes from the remote repository
+git fetch origin
 
+# 2. Hard reset your current branch to match the remote branch (replace 'main' with your branch name)
+git reset --hard origin/main
+
+# 3. Clean
+git clean -fd  
+```
 ## Rust — Cargo Project
 ```
 cargo new <name>                  # new binary project
